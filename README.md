@@ -57,19 +57,9 @@ Roles: `admin`, `coordinator`, `moderator`, `marketing`, `emc_chair`, `staff`.
 Only `admin` can change the list. Removing someone is a `delete` — they can still
 sign in, but see nothing.
 
-**3. Switch the sign-in email to a code.** Supabase sends whatever its email
-template contains. In Supabase → Authentication → Emails → **Magic Link**, replace
-the body with something that includes `{{ .Token }}`:
-
-    <h2>Your NACBA sign-in code</h2>
-    <p>Enter this code to sign in:</p>
-    <p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
-    <p>It expires in one hour. If you did not ask for it, ignore this email.</p>
-
-Leave `{{ .ConfirmationURL }}` out entirely — a template with both sends a link
-*and* a code, which is just confusing.
-
-Redirect URLs are then only needed if you ever go back to links.
+**3. Allow the site to receive sign-in links.** In Supabase → Authentication → URL
+Configuration, add the published site URL to **Redirect URLs**. Sign-in links fail
+silently without this.
 
 **4. Optional but recommended.** In Authentication → Providers → Email, turn off
 "Enable sign-ups" once everyone is added. Strangers can otherwise request a link

@@ -44,9 +44,3 @@ Assertions here look for markup in context — `class="card"` followed by
 `cat-tags` — not just the presence of a word. A check for the text
 "Student Loans" passed for weeks while the card rendered no tags at all,
 because the filter chips contain the same words.
-
-    node test/signin.js
-
-Covers the two-step sign-in: asking for a code, entering it, a wrong code, and
-signing out. Note that this only works once the Supabase Magic Link email
-template contains `{{ .Token }}` — the app cannot make Supabase send a code.
