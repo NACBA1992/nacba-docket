@@ -74,6 +74,11 @@
   .msg.ok{background:var(--ok-soft);color:var(--ok)}
   .msg.err{background:var(--critical-soft);color:var(--critical)}
   .gate .fine{font-size:.82rem;color:var(--faint);margin-top:1.5rem}
+  .gate input.code{font-size:1.9rem;font-weight:600;letter-spacing:.42em;text-align:center;
+    padding:.7rem .5rem .7rem .92rem;font-variant-numeric:tabular-nums}
+  .gate input.code::placeholder{color:var(--rule-strong);font-weight:400}
+  .linky{background:none;border:none;padding:0;font:inherit;font-size:.82rem;
+    color:var(--accent);cursor:pointer;text-decoration:underline}
 
   /* ---- masthead ---- */
   header.masthead{padding:3rem 0 1.5rem;border-bottom:2px solid var(--ink);margin-bottom:2rem;
@@ -383,25 +388,85 @@ let view = { name:"season", tab:"upcoming", id:null, edit:false, editSpeaker:nul
 const app = document.getElementById("app");
 
 /* ================= sign in ================= */
-function renderGate(msg, kind) {
-  app.innerHTML =
+/* Sign-in is a six-digit code, not a link. Two steps: ask for the email,
+   then verify the code. Supabase sends whichever the email template
+   contains — the template must use {{ .Token }} for this to work. */
+let gate = { step: "email", email: "", msg: "", kind: "" };
+
+function renderGate(patch) {
+  if (patch) gate = { ...gate, ...patch };
+  const head =
     '<div class="gate"><span class="logo-plate"><img src="assets/nacba-logo.png" ' +
     'alt="National Association of Consumer Bankruptcy Attorneys" width="200" height="35"></span>' +
-    '<p class="eyebrow">Education Committee</p><h1>Webinar Docket</h1>' +
-    "<p>Enter your work email and we'll send you a sign-in link. No password to remember.</p>" +
-    '<form id="signin"><input type="email" id="email" placeholder="you@example.com" required autocomplete="email">' +
-    '<button type="submit">Send sign-in link</button></form>' +
-    (msg ? '<div class="msg '+kind+'">'+esc(msg)+"</div>" : "") +
+    '<p class="eyebrow">Education Committee</p><h1>Webinar Docket</h1>';
+  const note = gate.msg ? '<div class="msg '+gate.kind+'">'+esc(gate.msg)+"</div>" : "";
+
+  if (gate.step === "code") {
+    app.innerHTML = head +
+      "<p>We sent a six-digit code to <b>" + esc(gate.email) + "</b>. " +
+      "Enter it below. The code lasts one hour.</p>" +
+      '<form id="verify">' +
+      '<input type="text" id="code" class="code" inputmode="numeric" ' +
+        'autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" ' +
+        'placeholder="000000" aria-label="Six-digit code" required>' +
+      '<button type="submit">Sign in</button></form>' + note +
+      '<p class="fine"><button type="button" class="linky" id="resend">Send a new code</button>' +
+      ' · <button type="button" class="linky" id="other">Use a different email</button></p></div>';
+
+    const input = document.getElementById("code");
+    input.focus();
+    // strip anything that is not a digit, and submit as soon as six arrive
+    input.addEventListener("input", () => {
+      const before = input.value;
+      input.value = before.replace(/\D/g, "").slice(0, 6);
+      if (input.value.length === 6) document.getElementById("verify").requestSubmit();
+    });
+
+    document.getElementById("verify").addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = e.target.querySelector("button"), token = input.value.trim();
+      if (token.length !== 6) { renderGate({ msg:"That code is six digits.", kind:"err" }); return; }
+      btn.disabled = true; btn.textContent = "Checking…";
+      const { error } = await sb.auth.verifyOtp({ email: gate.email, token, type: "email" });
+      if (error) {
+        renderGate({ msg: /expired|invalid/i.test(error.message)
+          ? "That code is wrong or has expired. Ask for a new one."
+          : error.message, kind:"err" });
+      }
+      // success falls through to onAuthStateChange, which boots the app
+    });
+
+    document.getElementById("resend").addEventListener("click", () => sendCode(gate.email, true));
+    document.getElementById("other").addEventListener("click", () =>
+      renderGate({ step:"email", msg:"", kind:"" }));
+    return;
+  }
+
+  app.innerHTML = head +
+    "<p>Enter your work email and we'll send you a six-digit code. " +
+    "No password to remember.</p>" +
+    '<form id="signin"><input type="email" id="email" placeholder="you@example.com" ' +
+      'value="'+esc(gate.email)+'" required autocomplete="email">' +
+    '<button type="submit">Send my code</button></form>' + note +
     '<p class="fine">Access is limited to staff on the Education Committee list.</p></div>';
-  document.getElementById("signin").addEventListener("submit", async e => {
+
+  document.getElementById("signin").addEventListener("submit", e => {
     e.preventDefault();
-    const btn=e.target.querySelector("button"), email=val("email");
-    btn.disabled=true; btn.textContent="Sending…";
-    const { error } = await sb.auth.signInWithOtp({ email,
-      options:{ emailRedirectTo: window.location.href.split("#")[0] } });
-    renderGate(error ? error.message : "Check "+email+" for your sign-in link. It expires in an hour.",
-      error ? "err" : "ok");
+    sendCode(val("email"));
   });
+}
+
+async function sendCode(email, again) {
+  if (!email) return;
+  const btn = document.querySelector(".gate button[type=submit]");
+  if (btn && !again) { btn.disabled = true; btn.textContent = "Sending…"; }
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) {
+    renderGate({ step:"email", email, msg:error.message, kind:"err" });
+    return;
+  }
+  renderGate({ step:"code", email,
+    msg: again ? "A new code is on its way." : "", kind: again ? "ok" : "" });
 }
 
 /* ================= data ================= */
@@ -1391,7 +1456,7 @@ function renderTeam(){
       rows + "</section>" + addForm +
     '<p class="sub" style="max-width:60ch;color:var(--muted);font-size:.9rem">' +
     "Adding an email authorizes it — it does not create an account or send anything. " +
-    "The person goes to this site, enters that email, and gets a sign-in link. Until " +
+    "The person goes to this site, enters that email, and gets a six-digit code. Until " +
     "their address is on this list they can sign in and still see nothing.</p>");
 }
 
@@ -1853,7 +1918,7 @@ function wire(){
   const on=(sel,ev,fn)=>app.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,fn.bind(null,el)));
 
   document.getElementById("signout")?.addEventListener("click", async ()=>{
-    await sb.auth.signOut(); session=null; renderGate();
+    await sb.auth.signOut(); session=null; renderGate({ step:"email", email:"", msg:"", kind:"" });
   });
   document.getElementById("programs-btn")?.addEventListener("click", ()=>{
     view={ name:"season", tab:"upcoming", id:null, speakerId:null, q:"", cat:null, stype:null,
@@ -2037,7 +2102,7 @@ function wire(){
 async function boot(){
   const { data } = await sb.auth.getSession();
   session=data.session;
-  if (!session) { renderGate(); return; }
+  if (!session) { renderGate({ step:"email", msg:"", kind:"" }); return; }
   try {
     await loadData();
     if (!programs.length){
@@ -2046,7 +2111,7 @@ async function boot(){
         "Education Committee list, so there is nothing to show. Ask an administrator to add it.</p>"+
         '<button class="btn" id="so2">Sign out</button></div>';
       document.getElementById("so2").addEventListener("click", async ()=>{
-        await sb.auth.signOut(); session=null; renderGate(); });
+        await sb.auth.signOut(); session=null; renderGate({ step:"email", email:"", msg:"", kind:"" }); });
       return;
     }
     render();
