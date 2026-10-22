@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <meta name="theme-color" content="#0B243A">
-<title>NACBA Webinar Docket</title>
+<title>NACBA Speaker Docket</title>
 <style>
   /* NACBA brand — sampled from the logo files.
      navy #0B243A · mid blue #4F98CA · light blue #BADEF6
@@ -387,7 +387,7 @@ function renderGate(msg, kind) {
   app.innerHTML =
     '<div class="gate"><span class="logo-plate"><img src="assets/nacba-logo.png" ' +
     'alt="National Association of Consumer Bankruptcy Attorneys" width="200" height="35"></span>' +
-    '<p class="eyebrow">Education Committee</p><h1>Webinar Docket</h1>' +
+    '<p class="eyebrow">Education Committee</p><h1>Speaker Docket</h1>' +
     "<p>Enter your work email and we'll send you a sign-in link. No password to remember.</p>" +
     '<form id="signin"><input type="email" id="email" placeholder="you@example.com" required autocomplete="email">' +
     '<button type="submit">Send sign-in link</button></form>' +
@@ -989,7 +989,8 @@ function chrome(inner){
     '<img src="assets/nacba-logo.png" alt="National Association of Consumer ' +
     'Bankruptcy Attorneys" width="200" height="35"></span>' +
     '<p class="eyebrow">Education Committee</p>' +
-    "<h1>Webinar Docket</h1></div><div class=\"masthead-right\">" +
+    "<h1>Speaker Docket
+  </h1></div><div class=\"masthead-right\">" +
     '<span class="today">' + esc(FMT_FULL.format(todayUTC())) + "<br>" +
     esc(session?.user?.email||"") + '</span><div class="btn-row">' +
     nav("programs-btn","Programs", view.name==="detail" ||
