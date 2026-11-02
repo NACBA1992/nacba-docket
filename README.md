@@ -99,6 +99,26 @@ ever one is read out.
 programs start near the top of the screen. Open it for the program-by-program list.
 That choice is remembered too.
 
+## Suggestions, and commenting on them
+
+The **Suggestions** tab is both the suggestion box and the build plan: anyone on
+the allow-list can raise a change to the portal, to how we work, or to a document
+that ought to exist, and the status says where an item sits rather than how good
+it is. Ideas for future *programs* belong in **Ideas** — a different table with a
+different shape, deliberately kept apart.
+
+Every suggestion carries a comment thread. The count sits on the card even while
+the thread is shut, because feedback nobody can see is feedback nobody gives, and
+only one thread opens at a time so fifteen items stay scrollable. The author is
+stamped by the database from the signed-in email, never sent by the browser, and
+RLS allows you to edit or delete only your own comment — so the **Delete** link
+appears on yours and on nobody else's.
+
+Comments are deliberately **not** written to the change log. The row already
+records who said what and when, so logging it would write every comment down
+twice and bury the field edits the log exists for. See the header of
+`supabase/migrations/20261102000600_suggestion_comments.sql`.
+
 ## Deploying
 
 Any static host works; the app is one file. For GitHub Pages: Settings → Pages →

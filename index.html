@@ -159,6 +159,35 @@
     font-variant-numeric:tabular-nums}
   .alerts-list{margin-top:2px}
 
+  /* ---- comments on a suggestion ----
+     Feedback is the whole point of the board, so the count sits on the card
+     even while the thread is shut: a conversation nobody can see is a
+     conversation nobody joins. */
+  .sc-foot{margin-top:.7rem;padding-top:.55rem;border-top:1px solid var(--rule)}
+  .sc-toggle{display:inline-flex;align-items:center;gap:.4rem;background:none;
+    border:none;padding:0;font-size:.82rem;font-weight:600;color:var(--accent)}
+  .sc-toggle:hover{text-decoration:underline}
+  .sc-caret{font-size:.58rem;transition:transform .12s ease}
+  .sc-toggle[aria-expanded="true"] .sc-caret{transform:rotate(90deg)}
+  .sc-thread{margin-top:.6rem;display:flex;flex-direction:column;gap:.55rem}
+  .sc-c{border-left:2px solid var(--rule-strong);padding-left:.6rem}
+  .sc-who{display:flex;align-items:baseline;gap:.5rem;margin:0;font-size:.8rem;
+    font-weight:600;color:var(--muted)}
+  .sc-when{font-weight:400;color:var(--faint);font-variant-numeric:tabular-nums}
+  .sc-del{margin-left:auto;background:none;border:none;padding:0;font-size:.76rem;
+    color:var(--faint)}
+  .sc-del:hover{color:var(--critical);text-decoration:underline}
+  .sc-body{margin:.15rem 0 0;font-size:.9rem;line-height:1.45;max-width:62ch;
+    white-space:pre-wrap}
+  .sc-none{margin:0;font-size:.84rem;color:var(--faint)}
+  .sc-add{display:flex;gap:.5rem;align-items:flex-start}
+  /* The box sits outside .form, so it inherits none of the field styling and
+     would otherwise come out in the browser's default monospace. */
+  .sc-add textarea{flex:1;font:inherit;font-size:.9rem;line-height:1.5;
+    min-height:3.2rem;resize:vertical;padding:.45rem .6rem;
+    border:1px solid var(--rule-strong);border-radius:3px;
+    background:var(--surface-2);color:var(--ink)}
+
   /* ---- segmented toggles (cards/calendar, month/quarter) ---- */
   .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:3px;overflow:hidden}
   .seg-b{background:var(--surface);border:none;border-left:1px solid var(--rule);
@@ -374,6 +403,10 @@
     body{padding:0 1rem 4rem} header.masthead{padding-top:2rem}
     .masthead-right{align-items:flex-start}
     .alert{grid-template-columns:1fr;gap:.3rem} .a-go{justify-self:start}
+    /* Stacked, the box must still fill the width: a column flex container
+       set to flex-start would otherwise leave it at a textarea's default. */
+    .sc-add{flex-direction:column;align-items:stretch}
+    .sc-add .btn{align-self:flex-start}
     .ar-chips{margin-left:0}
     .cal-ev{display:none!important} .cal-dots{display:flex}
     .cal-months:not(.is-q) .cal-list{display:flex}
@@ -531,7 +564,7 @@ const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 
 let session=null, programs=[], roster=[], history=[], links={}, uploads={},
-    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, progPeople={}, suggestions=[], busy=false;
+    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, progPeople={}, suggestions=[], suggComments={}, busy=false;
 let view = { name:"season", tab:"upcoming", id:null, edit:false, editSpeaker:null,
   creating:false, cat:null, speakerId:null, q:"", stype:null, editRoster:false,
   istatus:null, editIdea:null, editStats:false };
@@ -573,7 +606,8 @@ function renderGate(msg, kind) {
 
 /* ================= data ================= */
 async function loadData() {
-  const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes, ppRes, sgRes] = await Promise.all([
+  const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes, ppRes, sgRes,
+         sgcRes] = await Promise.all([
     sb.from("programs").select(`id, slug, event_date, title, description, note, kind,
       archived, venue, location, store_url, recording_url,
       program_speakers ( id, topic, confirmation, sort_order,
@@ -598,7 +632,8 @@ async function loadData() {
     sb.from("idea_categories").select("idea_id, category_id"),
     sb.from("program_metrics").select("*"),
     sb.from("program_people").select("program_id, role, email"),
-    sb.from("suggestions").select("*").order("created_at", { ascending:false })
+    sb.from("suggestions").select("*").order("created_at", { ascending:false }),
+    sb.from("suggestion_comments").select("*").order("created_at")
   ]);
   if (pRes.error) throw pRes.error;
   programs = (pRes.data||[]).map(p => ({ ...p,
@@ -631,6 +666,10 @@ async function loadData() {
     (progPeople[r.program_id] = progPeople[r.program_id] || {})[r.role] = r.email; });
   // 20261102000500 may not have been run yet — degrade quietly rather than error
   suggestions = sgRes.error ? [] : (sgRes.data || []);
+  // 20261102000600 likewise. Oldest first, which is the order a thread reads in.
+  suggComments = {};
+  (sgcRes.error ? [] : (sgcRes.data||[])).forEach(c => {
+    (suggComments[c.suggestion_id] = suggComments[c.suggestion_id] || []).push(c); });
   const me = (session?.user?.email || "").toLowerCase();
   myEmail = me;
   myRole = (team.find(t => (t.email||"").toLowerCase() === me) || {}).role || "staff";
@@ -830,6 +869,23 @@ const setSuggestionStatus = (id, status) =>
 
 const deleteSuggestion = id =>
   mutate(() => sb.from("suggestions").delete().eq("id", id), "Suggestion removed");
+
+/* Comments on a suggestion. Nothing here sends an author: the database
+   stamps it from the signed-in email, so a comment cannot be posted under
+   someone else's name, and RLS lets you delete only your own. See the
+   suggestion_comments migration. */
+async function addSuggComment(id){
+  const body = val("sc-body-" + id);
+  if (!body) { toast("Write something first", true); return; }
+  await mutate(() => sb.from("suggestion_comments").insert({
+    suggestion_id: id, body
+  }), "Comment added");
+}
+
+const deleteSuggComment = id =>
+  mutate(() => sb.from("suggestion_comments").delete().eq("id", id), "Comment removed");
+
+const isMine = email => !!myEmail && (email||"").toLowerCase() === myEmail;
 
 /* Scheduling turns an idea into a real program: it gets a date, a docket,
    and the idea keeps a link so the season can say where it came from. */
@@ -1655,6 +1711,7 @@ function renderSuggestions(){
         '<button class="btn" data-sdel="'+x.id+'" data-t="'+esc(x.title)+'">Delete</button>' +
       "</div></div>" +
       (view.editSugg === x.id ? suggestionForm(x) : "") +
+      suggestionThread(x) +
     "</section>").join("") : '<p class="empty-note">Nothing here yet.</p>';
 
   return chrome(
@@ -1679,6 +1736,35 @@ function renderSuggestions(){
       '<div class="form-actions">' +
       '<button class="btn primary" id="ns-add">Add suggestion</button>' +
       "</div></div></section>" + rows);
+}
+
+/* One thread open at a time: fifteen items with their discussions all
+   unrolled is a page nobody scrolls. The count stays visible either way. */
+function suggestionThread(x){
+  const list = suggComments[x.id] || [], open = view.openSugg === x.id;
+  const label = list.length
+    ? list.length + (list.length === 1 ? " comment" : " comments")
+    : "Add a comment";
+  const head = '<button class="sc-toggle" data-scopen="' + x.id +
+    '" aria-expanded="' + open + '"><span class="sc-caret" aria-hidden="true">' +
+    "\u25b6</span>" + esc(label) + "</button>";
+  if (!open) return '<div class="sc-foot">' + head + "</div>";
+
+  const rows = list.map(c =>
+    '<div class="sc-c"><p class="sc-who">' +
+      esc(personLabel(c.author) || "someone") +
+      '<span class="sc-when">' + esc(FMT_LOG.format(new Date(c.created_at))) + "</span>" +
+      (isMine(c.author)
+        ? '<button class="sc-del" data-scdel="' + c.id + '">Delete</button>' : "") +
+    '</p><p class="sc-body">' + esc(c.body) + "</p></div>").join("");
+
+  return '<div class="sc-foot">' + head + '<div class="sc-thread">' +
+    (rows || '<p class="sc-none">Nothing yet. Say what you think.</p>') +
+    '<div class="sc-add">' +
+      '<textarea id="sc-body-' + x.id + '" rows="2" aria-label="Your comment" ' +
+      'placeholder="What do you think?"></textarea>' +
+      '<button class="btn primary" data-scadd="' + x.id + '">Post</button>' +
+    "</div></div></div>";
 }
 
 function suggestionForm(x){
@@ -2423,7 +2509,7 @@ function wire(){
   document.getElementById("sugg-btn")?.addEventListener("click", ()=>{
     view={ name:"season", tab:"suggestions", id:null, speakerId:null, q:"", cat:null,
            stype:null, edit:false, editSpeaker:null, editRoster:false, creating:false,
-           sstatus:null, editSugg:null, editStats:false };
+           sstatus:null, editSugg:null, openSugg:null, editStats:false };
     render(); window.scrollTo(0,0);
   });
   document.getElementById("ns-add")?.addEventListener("click", addSuggestion);
@@ -2562,6 +2648,13 @@ function wire(){
     setSuggestionStatus(el.getAttribute("data-sstatus"), el.value));
   on("[data-sedit]","click",el=>{
     view={ ...view, editSugg: el.getAttribute("data-sedit") }; render(); });
+  on("[data-scopen]","click",el=>{
+    const id = el.getAttribute("data-scopen");
+    view={ ...view, openSugg: view.openSugg===id ? null : id }; render(); });
+  on("[data-scadd]","click",el=> addSuggComment(el.getAttribute("data-scadd")));
+  on("[data-scdel]","click",el=>{
+    if (window.confirm("Delete your comment?"))
+      deleteSuggComment(el.getAttribute("data-scdel")); });
   on("[data-sdel]","click",el=>{
     if (confirm("Delete the suggestion \"" + el.getAttribute("data-t") + "\"?"))
       deleteSuggestion(el.getAttribute("data-sdel")); });

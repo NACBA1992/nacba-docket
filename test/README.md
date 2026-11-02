@@ -68,6 +68,39 @@ that asserted "the titles are in the cells" would therefore pass on a
 phone where they are invisible — hence the separate assertions that the
 list exists and that the dots do.
 
+    node test/suggestions.js
+
+Covers the suggestion board and the build plan it doubles as. The list of
+statuses and areas is written twice — `SUGG_STATUS` / `SUGG_AREAS` in
+`index.html` and the CHECK constraints in the migration — so the first
+block reads the migration and compares the two in both directions. A
+value the UI offers and the database rejects shows up only as a toast.
+
+    node test/comments.js
+
+Covers commenting on a suggestion.
+
+The thread is shut by default, so almost every assertion about a card
+would also pass with the whole feature deleted. The open/shut pair is
+what catches that, together with the count on the shut card — and the
+helpers cut out one card before asserting anything, because a comment
+body and a suggestion title are both on the page regardless.
+
+Two things here are claims about the database, asserted from both sides.
+The **Delete** link is an authorisation claim: RLS allows deleting only
+your own comment, so offering the button on someone else's is a promise
+the database will refuse. And the textarea id is written twice —
+`id="sc-body-<id>"` in `suggestionThread()`, `val("sc-body-" + id)` in
+`addSuggComment()`. If those drift, Post silently sends an empty body and
+the symptom is a toast telling you to write something in a box you just
+typed into.
+
+A comment is the only text on that screen somebody else wrote, so
+escaping is tested with a real `<script>` tag rather than assumed.
+
+The clock is **not** pinned here, unlike `calendar.js`: nothing in this
+feature does date arithmetic, and the timestamps only have to render.
+
     node test/kinds.js
 
 Covers the eleven program types NACBA runs, added 2 November 2026 at

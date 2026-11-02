@@ -192,7 +192,11 @@ console.log('the data is actually asked for, and actually written:');
 ok('loadData queries the table', /sb\.from\("suggestions"\)\.select/.test(SRC));
 ok('a missing table degrades quietly instead of blanking the portal',
   /suggestions = sgRes\.error \? \[\] :/.test(SRC));
-ok('the result is destructured, not dropped', /mRes, ppRes, sgRes\] = await/.test(SRC));
+// Matched as "sgRes is somewhere in the binding list" rather than as the exact
+// line: every new query in loadData adds a name after it, and an assertion that
+// breaks each time one is added teaches people to edit the test, not read it.
+ok('the result is destructured, not dropped',
+  /const \[[^\]]*\bsgRes\b[^\]]*\] = await Promise\.all\(/.test(SRC));
 ok('adding writes an insert', /sb\.from\("suggestions"\)\.insert/.test(SRC));
 ok('editing writes an update', /sb\.from\("suggestions"\)\.update\(\{\s*\n?\s*title:/.test(SRC));
 ok('changing status writes an update', /update\(\{ status \}\)\.eq\("id", id\)/.test(SRC));
