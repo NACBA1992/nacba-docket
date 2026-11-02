@@ -241,6 +241,9 @@
   td.c-off{font-size:.85rem;font-weight:600;color:var(--accent);white-space:nowrap}
   td.c-date{font-size:.85rem;color:var(--muted);white-space:nowrap}
   td.c-owner,td.c-src,td.c-by{font-size:.82rem;color:var(--faint);white-space:nowrap}
+  td.c-assign{white-space:nowrap}
+  td.c-assign select{font-size:.82rem;max-width:11rem}
+  .by-hand{margin-left:.3rem;color:var(--accent)}
   tr.done td.c-task{color:var(--faint);text-decoration:line-through;text-decoration-thickness:1px}
   tr.done td.c-off{color:var(--faint)}
   tr.late td.c-date{color:var(--critical);font-weight:600}
@@ -394,7 +397,7 @@ const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 
 let session=null, programs=[], roster=[], history=[], links={}, uploads={},
-    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", ideas=[], ideaCats={}, metrics={}, runSheet={}, busy=false;
+    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, busy=false;
 let view = { name:"season", tab:"upcoming", id:null, edit:false, editSpeaker:null,
   creating:false, cat:null, speakerId:null, q:"", stype:null, editRoster:false,
   istatus:null, editIdea:null, editStats:false };
@@ -427,11 +430,13 @@ async function loadData() {
   const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes] = await Promise.all([
     sb.from("programs").select(`id, slug, event_date, title, description, note, kind,
       archived, venue, location, store_url, recording_url,
+      coordinator_email, moderator_email,
       program_speakers ( id, topic, confirmation, sort_order,
         speakers ( id, full_name, preferred_title, firm, address, email, phone, pronunciation,
                    headshot_location, bio_location, speaker_type, name_audio_at ),
         deliverables ( id, item, received ) ),
-      tasks ( id, offset_days, seq, task, owner_role, source_ref, is_gate, gate_key, done, done_by )`)
+      tasks ( id, offset_days, seq, task, owner_role, source_ref, is_gate, gate_key, done, done_by,
+              assignee_email, assignee_set )`)
       .order("event_date"),
     sb.from("speakers").select("id, full_name, preferred_title, firm, email, phone, pronunciation, speaker_type, notes, name_audio_at").order("full_name"),
     sb.from("speaker_links")
@@ -474,6 +479,7 @@ async function loadData() {
   metrics = {};
   (mRes.error ? [] : (mRes.data||[])).forEach(m => { metrics[m.program_id] = m; });
   const me = (session?.user?.email || "").toLowerCase();
+  myEmail = me;
   myRole = (team.find(t => (t.email||"").toLowerCase() === me) || {}).role || "staff";
 }
 
@@ -723,6 +729,49 @@ const setUserRole = (email, role) =>
 
 const removeUser = email =>
   mutate(() => sb.from("allowed_emails").delete().eq("email", email), "Access removed");
+
+/* ---- people, for assignment ----
+   `owner_role` on a task is the RULE copied from the template; these turn it
+   into a person. The inheritance rule is mirrored in SQL (inherit_assignee)
+   so a reassignment made here and one made by the trigger agree. */
+const personLabel = email => {
+  if (!email) return "";
+  const t = team.find(x => (x.email||"").toLowerCase() === email.toLowerCase());
+  return (t && t.full_name) ? t.full_name : email.split("@")[0];
+};
+
+const personOptions = (selected, blank) =>
+  '<option value="">'+esc(blank)+"</option>"+
+  team.map(t => '<option value="'+esc(t.email)+'"'+
+    ((selected||"").toLowerCase() === (t.email||"").toLowerCase() ? " selected" : "")+
+    ">"+esc(t.full_name || t.email)+"</option>").join("");
+
+const inheritedAssignee = (p, t) => {
+  const r = (t.owner_role||"").trim().toLowerCase();
+  if (r === "coordinator") return p.coordinator_email || "";
+  if (r === "moderator")   return p.moderator_email   || "";
+  return "";
+};
+
+const assignCell = t =>
+  '<select class="conf" data-assign="'+t.id+'" aria-label="Assigned to">'+
+  personOptions(t.assignee_email, "— unassigned —")+"</select>"+
+  (t.assignee_set
+    ? '<span class="by-hand" title="Chosen by hand — changing the program\'s '+
+      'coordinator or moderator will not move it">✎</span>'
+    : "");
+
+/* Choosing a person pins the task to them. Choosing "unassigned" releases it
+   back to whoever the program's coordinator or moderator is. */
+function setTaskAssignee(taskId, email){
+  const p = programs.find(x => x.tasks.some(t => t.id === taskId));
+  const t = p && p.tasks.find(x => x.id === taskId);
+  if (!p || !t) return;
+  const patch = email
+    ? { assignee_email: email, assignee_set: true }
+    : { assignee_email: inheritedAssignee(p, t), assignee_set: false };
+  return mutate(() => sb.from("tasks").update(patch).eq("id", taskId));
+}
 
 const catName = id => (categories.find(c => c.id === id) || {}).name || "";
 
@@ -1603,8 +1652,9 @@ function renderDetail(){
       (t.done?" checked":"")+' aria-label="'+esc(t.task)+'"></td><td class="c-off">'+
       offLabel(t.offset_days)+'</td><td class="c-date">'+esc(FMT_SHORT.format(due))+
       '</td><td class="c-task">'+esc(t.task)+(t.is_gate?'<span class="gate-mark">▪ gate</span>':"")+
-      '</td><td class="c-owner">'+esc(t.owner_role)+'</td><td class="c-src">'+esc(t.source_ref)+
-      '</td><td class="c-by">'+esc((t.done_by||"").split("@")[0])+"</td></tr>";
+      '</td><td class="c-owner">'+esc(t.owner_role)+'</td>'+
+      '<td class="c-assign">'+assignCell(t)+'</td><td class="c-src">'+esc(t.source_ref)+
+      '</td><td class="c-by">'+esc(personLabel(t.done_by))+"</td></tr>";
   }).join("");
   const catPanel = categories.length
     ? '<section class="panel"><p class="panel-head"><span>Categories</span>' +
@@ -1654,10 +1704,14 @@ function renderDetail(){
         '">Download</button></div>').join("")+'</section>'
     : "";
 
+  const mineOpen = myEmail
+    ? p.tasks.filter(t=>!t.done && (t.assignee_email||"").toLowerCase()===myEmail).length
+    : 0;
   const docket='<section class="panel"><p class="panel-head"><span>Docket</span><span>'+
+    (mineOpen ? mineOpen+" open for you · " : "")+
     p.tasks.filter(t=>t.done).length+" of "+p.tasks.length+" complete</span></p>"+
     '<div class="dk-scroll"><table class="dk"><thead><tr><th></th><th>Offset</th><th>Date</th>'+
-    "<th>Task</th><th>Owner</th><th>Source</th><th>By</th></tr></thead><tbody>"+dkRows+
+    "<th>Task</th><th>Owner</th><th>Assigned to</th><th>Source</th><th>By</th></tr></thead><tbody>"+dkRows+
     "</tbody></table></div></section>";
 
   return chrome('<button class="back" data-back>← All programs</button>'+head+
@@ -1692,6 +1746,16 @@ function editProgramForm(p){
     '<input type="text" id="ep-store" value="'+esc(p.store_url||"")+'"></div>'+
     '<div class="field"><label class="field-label" for="ep-rec">Recording link</label>'+
     '<input type="text" id="ep-rec" value="'+esc(p.recording_url||"")+'"></div></div>'+
+    '<div class="form-row">'+
+    '<div class="field"><label class="field-label" for="ep-coord">Coordinator</label>'+
+    '<select id="ep-coord">'+personOptions(p.coordinator_email, "— nobody yet —")+
+    "</select></div>"+
+    '<div class="field"><label class="field-label" for="ep-mod">Moderator</label>'+
+    '<select id="ep-mod">'+personOptions(p.moderator_email, "— nobody yet —")+
+    "</select></div></div>"+
+    '<p class="sub" style="margin:-.4rem 0 0;font-size:.85rem;color:var(--faint)">'+
+    "Docket tasks owned by a Coordinator or Moderator follow these two. Any task "+
+    "you assigned by hand keeps the person you chose.</p>"+
     '<label class="field-label" style="display:flex;align-items:center;gap:.5rem;'+
       'text-transform:none;font-size:.92rem;color:var(--ink);cursor:pointer">'+
     '<input type="checkbox" id="ep-archived" style="width:15px;height:15px;accent-color:var(--accent)"'+
@@ -1823,6 +1887,7 @@ async function saveProgram(id){
     description: val("ep-desc"), note: val("ep-note"),
     venue: val("ep-venue"), location: val("ep-loc"),
     store_url: val("ep-store"), recording_url: val("ep-rec"),
+    coordinator_email: val("ep-coord"), moderator_email: val("ep-mod"),
     archived: !!document.getElementById("ep-archived")?.checked
   }).eq("id",id));
 }
@@ -2048,6 +2113,7 @@ function wire(){
       removeSpeaker(el.getAttribute("data-rmsp")); });
   on("[data-conf]","change",el=>setConf(el.getAttribute("data-conf"), el.value));
   on("[data-task]","change",el=>setTask(el.getAttribute("data-task"), el.checked));
+  on("[data-assign]","change",el=>setTaskAssignee(el.getAttribute("data-assign"), el.value));
   on("[data-deliv]","change",el=>setDeliv(el.getAttribute("data-deliv"), el.checked));
 }
 

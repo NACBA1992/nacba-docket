@@ -82,3 +82,28 @@ bootstrap IIFE at the end of `speaker.html` opens with
 `(async () => {` silently truncates the module at `wireBio`. And the
 bio load is asynchronous, so assertions about prefilled values must
 await a tick or they read empty fields and look like a broken feature.
+
+    node test/assign.js
+
+Covers task assignment: the per-program coordinator and moderator, the
+inheritance rule, and the per-task override.
+
+Two traps drove how this one is written. First, the inheritance rule
+exists **twice** — `inherit_assignee` in SQL, for the triggers, and
+`inheritedAssignee` in JS, for the "revert to inherited" case. They can
+drift apart silently, so the pure-logic block pins the JS side including
+the case and whitespace tolerance; if you change one, change both.
+
+Second, a render test cannot see whether the data ever arrives. Every
+assertion about a dropdown would still pass if the `select()` in
+`loadData` never asked for `assignee_email`, because the rendered markup
+looks identical when the field is simply undefined — everything shows
+"unassigned". The last block therefore greps `index.html` for the query
+columns, the two `saveProgram` writes, and the change handler.
+
+Worth knowing: `personLabel` reads module state, so a test that calls it
+before any `draw()` sees an empty team and gets the fallback. Seed
+`team` first.
+
+The fixture uses invented addresses (`coord@example.org`). This repo is
+public — no real person's email belongs in a committed fixture.
