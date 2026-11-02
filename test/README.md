@@ -60,3 +60,25 @@ Virtual Workshop session is a workshop but is *not* in person.
 Every assertion reads inside the `<select>`, extracted by id. Asserting
 the bare label would pass even with an empty dropdown, because program
 cards print type labels too — the same trap `roster.js` fell into.
+
+    node test/bio.js
+
+Covers the bio builder, and is the first test to touch `speaker.html` at
+all — the page speakers actually see had no coverage until now.
+
+It renders the packet, then asserts the fields are really inside
+`<section id="bio">`, extracted by id. That matters here more than
+usual: this project has twice shipped a click handler with no markup
+behind it, and a bio textarea is invisible in exactly the same way.
+
+It also pins the RPC names and argument names the page sends. A typo in
+an RPC name is silent until a speaker presses Save, and no amount of
+rendering catches it — so the names are additionally cross-checked
+against the migration by hand when they change.
+
+Two traps this harness hit, worth knowing if you extend it: the
+bootstrap IIFE at the end of `speaker.html` opens with
+`(async function () {`, not an arrow, so cutting it by searching for
+`(async () => {` silently truncates the module at `wireBio`. And the
+bio load is asynchronous, so assertions about prefilled values must
+await a tick or they read empty fields and look like a broken feature.

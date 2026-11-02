@@ -132,6 +132,17 @@
   /* uploads */
   .up-form{display:grid;gap:.45rem}
   .up-label{font-size:.82rem;font-weight:600;color:var(--muted);margin-top:.5rem}
+  .up-form textarea,.bio-form textarea,.bio-form input[type=text]{font:inherit;font-size:.92rem;
+    padding:.55rem .65rem;border:1px solid var(--rule-strong);border-radius:8px;
+    background:var(--surface);color:inherit;width:100%;box-sizing:border-box;resize:vertical}
+  .bio-form{display:grid;gap:.45rem}
+  .bio-form textarea{line-height:1.5}
+  .bio-count{font-size:.74rem;color:var(--faint);margin:.1rem 0 .3rem;text-align:right}
+  .bio-count.over{color:var(--critical)}
+  .bio-stamp{font-size:.78rem;color:var(--faint);margin:.5rem 0 0}
+  .bio-shot{display:flex;align-items:center;gap:.8rem;margin-top:.4rem}
+  .bio-shot img{width:72px;height:72px;border-radius:8px;object-fit:cover;
+    border:1px solid var(--rule-strong)}
   .up-form select,.up-form input[type=file]{font:inherit;font-size:.92rem;padding:.5rem .6rem;
     border:1px solid var(--rule-strong);border-radius:3px;background:var(--surface-2);
     color:var(--ink);width:100%}
@@ -506,6 +517,38 @@ function render(d) {
     '<p class="rec-file">Or upload one: <input type="file" id="rec-file" accept="audio/*"></p>' +
     "</div></section>";
 
+  const bioPanel =
+    '<section id="bio"><h2>Your biography</h2>' +
+    '<p class="sub">Write this once and we keep it. It is what the moderator reads out, ' +
+    "what goes beside your name when we promote the program, and what we reuse the next " +
+    "time you speak \u2014 so you should not be asked for it again.</p>" +
+    '<div class="panel"><div class="bio-form">' +
+
+    '<label class="up-label" for="bio-short">Short version \u2014 for your introduction on air</label>' +
+    '<textarea id="bio-short" rows="3" placeholder="Two sentences. Who you are, where you practice, ' +
+    'and the one thing that makes you worth listening to on this topic."></textarea>' +
+    '<p class="bio-count" id="bio-short-count">&nbsp;</p>' +
+
+    '<label class="up-label" for="bio-full">Full version \u2014 for the program listing</label>' +
+    '<textarea id="bio-full" rows="9" placeholder="As long as you like. Plain text is fine; ' +
+    'there is no need to format it."></textarea>' +
+    '<p class="bio-count" id="bio-full-count">&nbsp;</p>' +
+
+    '<label class="up-label" for="bio-li">LinkedIn (optional)</label>' +
+    '<input type="text" id="bio-li" placeholder="https://www.linkedin.com/in/\u2026">' +
+
+    '<button class="btn primary" id="bio-go">Save my biography</button>' +
+    '<p class="up-status" id="bio-status">Loading what we already have\u2026</p>' +
+
+    '<div class="up-sent"><p class="up-head">Your headshot</p>' +
+    '<p class="sub" style="margin:0 0 .5rem">Used for NACBA promotion only, and kept against ' +
+    "your name rather than one webinar \u2014 send it once and we will not ask again.</p>" +
+    '<div class="bio-shot" id="bio-shot-now"></div>' +
+    '<p class="up-file" style="margin-top:.5rem">' +
+    '<input type="file" id="bio-shot" accept="image/jpeg,image/png,image/webp"></p>' +
+    '<p class="up-status" id="bio-shot-status"></p>' +
+    "</div></div></div></section>";
+
   const uploadPanel =
     "<section id=\"upload\"><h2>Send us your materials</h2>" +
     '<p class="sub">Upload here and it reaches your coordinator directly. Up to 10 MB per file. ' +
@@ -552,6 +595,8 @@ function render(d) {
       "time to review them and get them to members — and, where the program carries CLE " +
       "credit, to file the accreditation applications.</p></div></section>" +
 
+      bioPanel +
+
       uploadPanel +
 
     '</div><aside class="side">' + coPanel + nacbaPanel + detailsPanel + "</aside></div>" +
@@ -567,6 +612,7 @@ function render(d) {
 
   document.getElementById("print")?.addEventListener("click", () => window.print());
   wireRecorder(d);
+  wireBio(d);
 
   /* jump from a deadline row straight into the uploader, preselected */
   document.querySelectorAll("[data-jump]").forEach(el =>
@@ -641,6 +687,115 @@ window.addEventListener("afterprint", () => {
 /* Recording the speaker's own name. MediaRecorder needs a secure context
    and permission; where it is unavailable the file picker still works, so
    a voice memo from a phone does the same job. */
+/* ------------------------------------------------------------------
+   The bio builder. Loads whatever we already hold, so a returning
+   speaker edits rather than retypes, and saves against the person
+   rather than this one booking.
+   ------------------------------------------------------------------ */
+function wireBio(d){
+  const shortEl  = document.getElementById("bio-short");
+  const fullEl   = document.getElementById("bio-full");
+  const liEl     = document.getElementById("bio-li");
+  const go       = document.getElementById("bio-go");
+  const status   = document.getElementById("bio-status");
+  const shotIn   = document.getElementById("bio-shot");
+  const shotNow  = document.getElementById("bio-shot-now");
+  const shotStat = document.getElementById("bio-shot-status");
+  if (!shortEl || !go) return;
+
+  const say = (el, msg, cls) => {
+    if (!el) return;
+    el.textContent = msg; el.className = "up-status " + (cls || "");
+  };
+
+  /* Word counts, because "about 60 words" is useless without one. */
+  const words = t => (t.trim() ? t.trim().split(/\s+/).length : 0);
+  const count = (src, out, limit) => {
+    const el = document.getElementById(out); if (!el) return;
+    const n = words(src.value);
+    el.textContent = n + (n === 1 ? " word" : " words") +
+      (limit ? " \u00b7 aim for under " + limit : "");
+    el.className = "bio-count" + (limit && n > limit ? " over" : "");
+  };
+  const recount = () => {
+    count(shortEl, "bio-short-count", 60);
+    count(fullEl,  "bio-full-count",  0);
+  };
+  shortEl.addEventListener("input", recount);
+  fullEl.addEventListener("input", recount);
+
+  const showShot = (at) =>
+    shotNow.innerHTML = at
+      ? '<span class="up-kind">on file</span><span class="up-meta">sent ' +
+        esc(FMT_DATE.format(new Date(at))) + "</span>"
+      : '<span class="up-empty">Nothing on file yet.</span>';
+
+  /* ---- load ---- */
+  (async () => {
+    try {
+      const { data: r, error } = await sb.rpc("speaker_bio", { tok });
+      if (error || !r?.ok) {
+        say(status, "", ""); recount(); showShot(null); return;
+      }
+      shortEl.value = r.bio_short || "";
+      fullEl.value  = r.bio || "";
+      liEl.value    = r.linkedin || "";
+      recount();
+      showShot(r.has_headshot ? (r.headshot_at || true) : null);
+      say(status, r.bio_updated_at
+        ? "Last saved " + FMT_DATE.format(new Date(r.bio_updated_at)) +
+          (r.bio_updated_by === "staff" ? " by NACBA \u2014 please check it reads as you would write it." : ".")
+        : "", r.bio_updated_by === "staff" ? "" : "");
+    } catch (e) { say(status, "", ""); recount(); showShot(null); }
+  })();
+
+  /* ---- save the text ---- */
+  go.addEventListener("click", async () => {
+    if (!shortEl.value.trim() && !fullEl.value.trim()) {
+      say(status, "Write something first \u2014 even a couple of sentences helps.", "err"); return;
+    }
+    go.disabled = true; say(status, "Saving\u2026");
+    try {
+      const { data: r, error } = await sb.rpc("speaker_save_bio", {
+        tok, p_bio: fullEl.value, p_bio_short: shortEl.value, p_linkedin: liEl.value
+      });
+      if (error)         say(status, "That didn't save. Please try again, or email your coordinator.", "err");
+      else if (!r?.ok)   say(status, r?.error || "That didn't save.", "err");
+      else               say(status, "Saved \u2014 thank you. We will not ask you for this again.", "ok");
+    } catch (e) {
+      say(status, "That didn't save. Please try again, or email your coordinator.", "err");
+    }
+    go.disabled = false;
+  });
+
+  /* ---- save the headshot ---- */
+  shotIn?.addEventListener("change", async () => {
+    const file = shotIn.files && shotIn.files[0];
+    if (!file) return;
+    if (file.size === 0)         { say(shotStat, "That file is empty.", "err"); return; }
+    if (file.size > MAX_BYTES)   { say(shotStat, "That image is " + kb(file.size) +
+                                     ". The limit is 10 MB.", "err"); return; }
+    say(shotStat, "Sending " + file.name + "\u2026");
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = () => res(String(r.result).split(",")[1] || "");
+        r.onerror = () => rej(new Error("read failed"));
+        r.readAsDataURL(file);
+      });
+      const { data: r, error } = await sb.rpc("speaker_save_headshot", {
+        tok, p_mime: file.type || "", p_b64: b64
+      });
+      if (error)       say(shotStat, "That didn't send. Please try again.", "err");
+      else if (!r?.ok) say(shotStat, r?.error || "That didn't send.", "err");
+      else {
+        say(shotStat, "Got it \u2014 thank you. " + kb(r.bytes) + " saved to your record.", "ok");
+        showShot(r.saved_at); shotIn.value = "";
+      }
+    } catch (e) { say(shotStat, "That didn't send. Please try again.", "err"); }
+  });
+}
+
 function wireRecorder(d){
   const go     = document.getElementById("rec-go");
   const play   = document.getElementById("rec-play");
