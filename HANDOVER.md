@@ -28,6 +28,15 @@ and a Supabase account. Both are free at this size.
 
 ---
 
+> **Status: done.** Both halves moved to NACBA in October 2026. The repo is
+> `NACBA1992/nacba-docket`; the Supabase project was transferred intact, keeping
+> ref `lnollnddtavdhigkkefy` and its keys. The custom domain `docket.nacba.org`
+> was set up first, exactly as advised below, so the site address never changed
+> and previously emailed speaker links kept working.
+>
+> The rest of this guide is kept for reference — it is the procedure to follow if
+> any of this ever moves again.
+
 ## The order matters
 
 **Move the database first, the website second — or better, set up a custom

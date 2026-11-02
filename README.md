@@ -1,10 +1,13 @@
-# NACBA Webinar Docket
+# NACBA Speaker Docket
 
 A shared tracker for NACBA Education Committee webinar operations. Enter a webinar
 date and the system generates every deadline that hangs off it — registration open,
 speaker package, materials, run of show, follow-up — with an owner on each one.
 
 Built for the 2026 season: 11 programs, 19 speakers.
+
+**Live at https://docket.nacba.org** — repo `NACBA1992/nacba-docket`, database
+Supabase `lnollnddtavdhigkkefy`. Both were transferred to NACBA in October 2026.
 
 ## What's in this repository
 
@@ -84,20 +87,24 @@ materials are **due at T−14**, **overdue at T−7** (the CLE filing cutoff), a
 Any static host works; the app is one file. For GitHub Pages: Settings → Pages →
 Deploy from branch → `main` / root.
 
-## Moving this to NACBA
+## Where this lives
 
-Both halves transfer independently.
+The move to NACBA is done. Both halves went across in October 2026.
 
-**The repo:** Settings → Transfer ownership. Free, keeps history, leaves redirects.
+**The repo** is `NACBA1992/nacba-docket`, served by GitHub Pages at the custom
+domain in `CNAME` — `docket.nacba.org`. Pushing to `main` redeploys the site.
+Changing Pages settings or the domain needs admin on the repo.
 
-**The database:** Supabase can transfer a project between organizations, but don't
-depend on it. The durable path is: create a project in NACBA's account, run
-`01_schema.sql`, export the tables as CSV from the old project and import them, then
-change the two constants at the top of `index.html`. About twenty minutes, and it
-works regardless of plan or org membership.
+**The database** was *transferred*, not rebuilt, so the project ref and the
+publishable key never changed and nothing in the code needed repointing. It is
+still Supabase project `lnollnddtavdhigkkefy`, now in NACBA's organization.
 
-Keeping this in its own Supabase project — never alongside other data — is what makes
-that possible.
+Because the custom domain was set up before the repo moved, the site address
+never changed, and speaker packet links kept working. If the domain is ever
+retired, every `speaker.html?k=…` link already emailed breaks — see HANDOVER.md.
+
+Keeping this in its own Supabase project — never alongside other data — is what
+made the transfer possible at all.
 
 ## Editing
 
