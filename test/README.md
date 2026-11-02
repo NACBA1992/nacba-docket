@@ -44,3 +44,19 @@ Assertions here look for markup in context — `class="card"` followed by
 `cat-tags` — not just the presence of a word. A check for the text
 "Student Loans" passed for weeks while the card rendered no tags at all,
 because the filter chips contain the same words.
+
+    node test/kinds.js
+
+Covers the eleven program types NACBA runs, added 2 November 2026 at
+Rachael Hodgen's request. Checks that all eleven are offered in the order
+she listed them, that `paid` is still first and still the default, and
+that the two retired types behave: never offered for a new program, but
+still offered — and selected — when editing a program already set to one,
+so a row saved before the change stays editable.
+
+Also pins the in-person rule, which is the easy thing to get wrong: a
+Virtual Workshop session is a workshop but is *not* in person.
+
+Every assertion reads inside the `<select>`, extracted by id. Asserting
+the bare label would pass even with an empty dropdown, because program
+cards print type labels too — the same trap `roster.js` fell into.

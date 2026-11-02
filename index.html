@@ -314,15 +314,33 @@ const ACCESS_ROLES = [
   { id:"staff",       label:"Staff",         note:"General access" }
 ];
 const roleLabel = r => (ACCESS_ROLES.find(x => x.id === r) || {}).label || r;
+// NACBA's own programme types, in the order Rachael listed them.
+// `paid` stays the default and keeps its id — see the program_types migration
+// for why the old ids are reused rather than renamed. `vendor` must keep its
+// id: agreement.html branches on it for the vendor terms.
 const PROGRAM_KINDS = [
-  { id:"paid",              label:"Paid webinar (CLE)" },
-  { id:"vendor",            label:"Vendor program (sponsored, free, no CLE)" },
-  { id:"marketing_minute",  label:"BK Marketing Minute" },
-  { id:"bk_talk",           label:"BK Talk" },
-  { id:"conference",        label:"Conference session (in person)" },
-  { id:"workshop",          label:"Workshop (in person)" }
+  { id:"paid",                   label:"Webinar \u2013 CLE" },
+  { id:"webinar_nocle",          label:"Webinar \u2013 Non-CLE" },
+  { id:"vendor",                 label:"Sponsored Webinar / Vendor Program" },
+  { id:"marketing_minute",       label:"BK Marketing Minute" },
+  { id:"bk_talk",                label:"BK Talk" },
+  { id:"convention_breakout",    label:"Annual Convention \u2013 Breakout Session" },
+  { id:"convention_plenary",     label:"Annual Convention \u2013 Plenary Session" },
+  { id:"workshop_members",       label:"Members-Only Workshop \u2013 Session" },
+  { id:"workshop_virtual",       label:"Virtual Workshop \u2013 Session" },
+  { id:"workshop_preconvention", label:"Pre-Convention Workshop" },
+  { id:"board_event",            label:"Board Meeting / Special Event" },
+  // Retired. Still valid in the database so rows saved before 2 Nov 2026 keep
+  // their label and stay editable, but offered only to a program already set
+  // to one, so nobody picks them again.
+  { id:"conference", label:"Conference session (in person)", retired:true },
+  { id:"workshop",   label:"Workshop (in person)",           retired:true }
 ];
-const IN_PERSON = k => k === "conference" || k === "workshop";
+// Everything on this list happens in a room. A virtual workshop does not.
+const IN_PERSON = k => ["convention_breakout","convention_plenary",
+  "workshop_members","workshop_preconvention","conference","workshop"].includes(k);
+// Retired types are hidden unless the program being edited already uses one.
+const kindOptions = cur => PROGRAM_KINDS.filter(k => !k.retired || k.id === cur);
 const IDEA_STATUS = [
   { id:"idea",        label:"Idea" },
   { id:"considering", label:"Considering" },
@@ -1479,7 +1497,7 @@ function newProgramForm(){
     '<div class="field"><label class="field-label" for="np-date">Event date</label>' +
     '<input type="date" id="np-date" required></div>' +
     '<div class="field"><label class="field-label" for="np-kind">Program type</label>' +
-    '<select id="np-kind">' + PROGRAM_KINDS.map(k =>
+    '<select id="np-kind">' + kindOptions(null).map(k =>
       '<option value="' + k.id + '">' + esc(k.label) + "</option>").join("") +
     "</select></div></div>" +
     '<div class="field"><label class="field-label" for="np-title">Program title</label>' +
@@ -1652,7 +1670,7 @@ function editProgramForm(p){
     '<div class="form-row"><div class="field"><label class="field-label" for="ep-date">Event date</label>'+
     '<input type="date" id="ep-date" value="'+esc(p.event_date)+'"></div>'+
     '<div class="field"><label class="field-label" for="ep-kind">Program type</label>'+
-    '<select id="ep-kind">'+PROGRAM_KINDS.map(k=>'<option value="'+k.id+'"'+
+    '<select id="ep-kind">'+kindOptions(p.kind||"paid").map(k=>'<option value="'+k.id+'"'+
       ((p.kind||"paid")===k.id?" selected":"")+">"+esc(k.label)+"</option>").join("")+
     "</select></div></div>"+
     '<p class="sub" style="margin:-.4rem 0 0;font-size:.85rem;color:var(--faint)">'+

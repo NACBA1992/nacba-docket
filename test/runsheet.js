@@ -72,6 +72,6 @@ view={...base,tab:'all'}; render(); h=global.__a.innerHTML;
 check('season card, program is today:',[
  ['card flags the run sheet', ()=>h.includes('Run sheet ready')],
  ['flag is inside a card', ()=>/class="card[^"]*"[^]*?Run sheet ready/.test(h)],
- ['vendor type shown on card', ()=>/class="card-foot"[^]*?Vendor program/.test(h)],
+ ['vendor type shown on card', ()=>/class="card-foot"[^]*?Sponsored Webinar \/ Vendor Program/.test(h)],
 ]);
 process.exit(fails?1:0);

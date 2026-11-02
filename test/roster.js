@@ -92,7 +92,18 @@ check('new program form:',[
  ['catalogue checkbox', ()=>h.includes('id="np-archived"')],
  ['store link field', ()=>h.includes('id="np-store"')],
  ['venue + location', ()=>h.includes('id="np-venue"')&&h.includes('id="np-loc"')],
- ['conference in kinds', ()=>h.includes('Conference session')],
+ // 'Conference session' was retired on 2 Nov 2026 in favour of NACBA's own
+ // types. The form must offer the replacements and must not offer the
+ // retired ones -- asserted inside the <select>, since program cards print
+ // type labels too.
+ ['in-person types offered', ()=>{
+    const m=/<select id="np-kind">([\s\S]*?)<\/select>/.exec(h);
+    return !!m && m[1].includes('Annual Convention \u2013 Breakout Session')
+               && m[1].includes('Members-Only Workshop \u2013 Session'); }],
+ ['retired types not offered', ()=>{
+    const m=/<select id="np-kind">([\s\S]*?)<\/select>/.exec(h);
+    return !!m && !m[1].includes('value="conference"')
+               && !m[1].includes('value="workshop"'); }],
 ]);
 
 // ---- editing a speaker from their own page ----
