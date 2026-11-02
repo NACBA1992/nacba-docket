@@ -82,6 +82,23 @@ The three conflicting materials deadlines in the source documents are resolved h
 materials are **due at T−14**, **overdue at T−7** (the CLE filing cutoff), and the
 48-hour item from §6.2 is *QC review complete* — not receipt of materials.
 
+## The season screen
+
+Programs show as cards or on a calendar; the **Cards / Calendar** toggle sits in the
+tab row and the choice is remembered per browser. The calendar runs a month or a
+quarter at a time — three months abreast — and `‹ Today ›` steps by one or by three.
+Colour follows the cards: red needs attention, blue is on track, grey has already run.
+Archived catalogue entries are left off it.
+
+On a wide single month the day cells carry the programme titles. Where that will not
+fit — three months abreast, or a phone — the cells fall back to dots and the titles
+move to a list under the grid. Both are always in the markup; CSS picks one, so only
+ever one is read out.
+
+**Needs attention** is a roll-up: one line of counts, closed on arrival, so the
+programs start near the top of the screen. Open it for the program-by-program list.
+That choice is remembered too.
+
 ## Deploying
 
 Any static host works; the app is one file. For GitHub Pages: Settings → Pages →

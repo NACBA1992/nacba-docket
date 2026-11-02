@@ -144,6 +144,97 @@
     background:none;border:none;padding:0;white-space:nowrap}
   .a-go:hover{text-decoration:underline}
 
+  /* The roll-up. Collapsed by default: the counts say how bad it is without
+     pushing every program card below the fold. Open it for the which-and-why. */
+  .alerts-roll{width:100%;display:flex;flex-wrap:wrap;gap:.35rem .7rem;align-items:center;
+    text-align:left;background:var(--critical-soft);border:1px solid var(--critical);
+    border-left-width:3px;border-radius:0 3px 3px 0;padding:.6rem .9rem}
+  .ar-caret{font-size:.62rem;color:var(--critical);flex:none;transition:transform .12s ease}
+  .alerts-roll[aria-expanded="true"] .ar-caret{transform:rotate(90deg)}
+  .ar-head{font-size:.84rem;font-weight:600;color:var(--critical)}
+  .ar-count{font-size:.84rem;color:var(--critical);opacity:.85;font-variant-numeric:tabular-nums}
+  .ar-chips{display:flex;flex-wrap:wrap;gap:.3rem;margin-left:auto}
+  .ar-chip{font-size:.74rem;font-weight:600;background:var(--surface);color:var(--critical);
+    border:1px solid var(--critical);border-radius:100px;padding:.1rem .55rem;white-space:nowrap;
+    font-variant-numeric:tabular-nums}
+  .alerts-list{margin-top:2px}
+
+  /* ---- segmented toggles (cards/calendar, month/quarter) ---- */
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:3px;overflow:hidden}
+  .seg-b{background:var(--surface);border:none;border-left:1px solid var(--rule);
+    padding:.42rem .8rem;font-size:.86rem;font-weight:600;color:var(--muted)}
+  .seg-b:first-child{border-left:none}
+  .seg-b:hover{color:var(--accent)}
+  .seg-b.is-on{background:var(--accent-soft);color:var(--accent)}
+
+  /* ---- calendar ---- */
+  .cal-bar{display:flex;flex-wrap:wrap;gap:.5rem .9rem;align-items:center;margin:0 0 1rem}
+  .cal-bar .spacer{flex:1}
+  .cal-nav{display:inline-flex;gap:.3rem}
+  .cal-nav .btn{min-width:2.2rem;text-align:center}
+  .cal-title{font-size:1.15rem;font-weight:600;letter-spacing:-.012em;margin:0}
+  .cal-sub{font-size:.82rem;color:var(--faint);font-variant-numeric:tabular-nums}
+  .cal-months{display:grid;gap:1.1rem;grid-template-columns:1fr}
+  .cal-months.is-q{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cal-m{background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+    padding:.85rem .9rem;box-shadow:var(--shadow);min-width:0}
+  .cal-m-head{font-size:.84rem;font-weight:600;color:var(--muted);margin:0 0 .6rem;
+    display:flex;justify-content:space-between;gap:.5rem;align-items:baseline}
+  .cal-m-head .n{color:var(--faint);font-weight:400;font-variant-numeric:tabular-nums}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;
+    background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .cal-dow{background:var(--surface-2);font-size:.68rem;font-weight:600;color:var(--faint);
+    text-align:center;padding:.3rem 0;letter-spacing:.04em}
+  .cal-d{background:var(--surface);min-height:5rem;padding:.3rem .32rem;display:flex;
+    flex-direction:column;gap:2px;min-width:0}
+  .cal-d.is-out{background:var(--surface-2)}
+  .cal-d.is-today{box-shadow:inset 0 0 0 2px var(--accent)}
+  .cal-dn{font-size:.72rem;color:var(--faint);font-variant-numeric:tabular-nums;line-height:1.3}
+  .cal-d.is-today .cal-dn{color:var(--accent);font-weight:700}
+  .cal-d.is-out .cal-dn{opacity:.45}
+  .cal-ev{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;
+    width:100%;text-align:left;font-size:.72rem;line-height:1.25;
+    font-weight:600;border:none;border-left:3px solid var(--brand);border-radius:0 2px 2px 0;
+    background:var(--accent-soft);color:var(--accent);padding:.16rem .3rem;overflow:hidden}
+  .cal-ev:hover{outline:1px solid var(--accent)}
+  .cal-ev.is-urgent{background:var(--critical-soft);color:var(--critical);
+    border-left-color:var(--critical)}
+  .cal-ev.is-done{background:var(--surface-2);color:var(--muted);
+    border-left-color:var(--rule-strong)}
+  /* Three months abreast, or one month on a phone, leaves no room for titles
+     in the cell. The dots keep the shape of the month; the list carries the
+     names. Only ever one of the two is on screen, so neither is read twice. */
+  .cal-dots{display:none;flex-wrap:wrap;gap:2px}
+  .cal-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--brand)}
+  .cal-dot.is-urgent{background:var(--critical)}
+  .cal-dot.is-done{background:var(--rule-strong)}
+  .cal-months.is-q .cal-ev{display:none!important}
+  .cal-months.is-q .cal-dots{display:flex}
+  .cal-months.is-q .cal-d{min-height:2.5rem}
+  .cal-months:not(.is-q) .cal-list{display:none}
+  .cal-list{display:flex;flex-direction:column;margin-top:.65rem}
+  .cal-li{display:grid;grid-template-columns:3.4rem 1fr;gap:.1rem .6rem;align-items:baseline;
+    text-align:left;background:none;border:none;border-top:1px solid var(--rule);
+    padding:.42rem 0;width:100%}
+  .cal-li:first-child{border-top:none}
+  .cal-li:hover .cal-li-t{color:var(--accent);text-decoration:underline}
+  .cal-li-d{font-size:.78rem;font-weight:600;color:var(--accent);white-space:nowrap;
+    font-variant-numeric:tabular-nums}
+  .cal-li-d.is-urgent{color:var(--critical)}
+  .cal-li-d.is-done{color:var(--faint)}
+  .cal-li-t{font-size:.87rem;line-height:1.35}
+  .cal-empty{font-size:.84rem;color:var(--faint);margin:.6rem 0 0}
+  .cal-legend{display:flex;flex-wrap:wrap;gap:.3rem 1.1rem;margin:1rem 0 0;
+    font-size:.78rem;color:var(--faint)}
+  .cal-legend span{display:inline-flex;align-items:center;gap:.35rem}
+  .cal-key{width:9px;height:9px;border-radius:2px;background:var(--brand);flex:none}
+  .cal-key.k-urgent{background:var(--critical)}
+  .cal-key.k-done{background:var(--rule-strong)}
+  @media (max-width:58rem){
+    .cal-months.is-q{grid-template-columns:1fr}
+    .cal-months.is-q .cal-d{min-height:3.4rem}
+  }
+
   /* ---- tabs ---- */
   .tabs{display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid var(--rule);
     align-items:center;flex-wrap:wrap}
@@ -283,6 +374,10 @@
     body{padding:0 1rem 4rem} header.masthead{padding-top:2rem}
     .masthead-right{align-items:flex-start}
     .alert{grid-template-columns:1fr;gap:.3rem} .a-go{justify-self:start}
+    .ar-chips{margin-left:0}
+    .cal-ev{display:none!important} .cal-dots{display:flex}
+    .cal-months:not(.is-q) .cal-list{display:flex}
+    .cal-d,.cal-months.is-q .cal-d{min-height:3rem}
     .hist-item{grid-template-columns:1fr}
     .sp-row{grid-template-columns:1fr;align-items:start}
   }
@@ -363,6 +458,26 @@ const IDEA_STATUS = [
   { id:"scheduled",   label:"Scheduled" },
   { id:"declined",    label:"Declined" }
 ];
+/* Suggestions are not program ideas. A program idea becomes a webinar; a
+   suggestion changes the portal, how we work, or a document that should
+   exist. The status says where something sits rather than how good it is,
+   which is what lets this list double as the build plan. */
+const SUGG_AREAS = [
+  { id:"portal",    label:"The portal" },
+  { id:"process",   label:"How we work" },
+  { id:"documents", label:"A document" },
+  { id:"other",     label:"Something else" }
+];
+const SUGG_STATUS = [
+  { id:"new",         label:"New" },
+  { id:"considering", label:"Considering" },
+  { id:"planned",     label:"Planned" },
+  { id:"done",        label:"Done" },
+  { id:"declined",    label:"Not doing" }
+];
+const suggAreaLabel   = a => (SUGG_AREAS.find(x => x.id === a) || {}).label || a;
+const suggStatusLabel = s => (SUGG_STATUS.find(x => x.id === s) || {}).label || s;
+
 const RUN_PHASES = [
   { id:"before", label:"Before we go live", when:"From 30 minutes out" },
   { id:"start",  label:"Going live",        when:"On the hour" },
@@ -399,20 +514,39 @@ const FMT_YEAR  = new Intl.DateTimeFormat("en-US",{month:"short",day:"numeric",y
 const FMT_FULL  = new Intl.DateTimeFormat("en-US",{weekday:"short",month:"long",day:"numeric",year:"numeric",timeZone:"UTC"});
 const FMT_CARD  = new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"});
 const FMT_LOG   = new Intl.DateTimeFormat("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+const FMT_MONTH = new Intl.DateTimeFormat("en-US",{month:"long",year:"numeric",timeZone:"UTC"});
+const FMT_MON   = new Intl.DateTimeFormat("en-US",{month:"short",year:"numeric",timeZone:"UTC"});
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 const parseISO = iso => { const [y,m,d]=iso.split("-").map(Number); return new Date(Date.UTC(y,m-1,d)); };
 const addDays  = (dt,n) => new Date(dt.getTime()+n*DAY);
 const todayUTC = () => { const n=new Date(); return new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())); };
 const diffDays = (a,b) => Math.round((b-a)/DAY);
+const isoOf    = d => d.toISOString().slice(0,10);
+const monthStart   = d => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+const quarterStart = d => new Date(Date.UTC(d.getUTCFullYear(), Math.floor(d.getUTCMonth()/3)*3, 1));
+const shiftMonths  = (d,n) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+n, 1));
 const offLabel = o => o===0 ? "T−0" : (o<0 ? "T−"+Math.abs(o) : "T+"+o);
 const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 
 let session=null, programs=[], roster=[], history=[], links={}, uploads={},
-    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, progPeople={}, busy=false;
+    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, progPeople={}, suggestions=[], busy=false;
 let view = { name:"season", tab:"upcoming", id:null, edit:false, editSpeaker:null,
   creating:false, cat:null, speakerId:null, q:"", stype:null, editRoster:false,
   istatus:null, editIdea:null, editStats:false };
+
+/* How the season is shown is a display choice, not data, and it lives outside
+   `view` on purpose: Programs, Ideas, Analytics and the rest rebuild `view`
+   from scratch, and a panel you closed should stay closed. Saved per browser,
+   so the roll-up does not spring open on every visit. */
+const pref = (k,d) => { try { const v=localStorage.getItem("docket."+k);
+  return v===null ? d : v; } catch(e){ return d; } };
+const setPref = (k,v) => { try { localStorage.setItem("docket."+k,v); } catch(e){} };
+let alertsOpen = pref("alertsOpen","0")==="1";
+let layout     = pref("layout","cards")==="calendar" ? "calendar" : "cards";
+let calSpan    = pref("calSpan","month")==="quarter" ? "quarter" : "month";
+let calAnchor  = null;      /* null = the month we are in */
 const app = document.getElementById("app");
 
 /* ================= sign in ================= */
@@ -439,7 +573,7 @@ function renderGate(msg, kind) {
 
 /* ================= data ================= */
 async function loadData() {
-  const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes, ppRes] = await Promise.all([
+  const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes, ppRes, sgRes] = await Promise.all([
     sb.from("programs").select(`id, slug, event_date, title, description, note, kind,
       archived, venue, location, store_url, recording_url,
       program_speakers ( id, topic, confirmation, sort_order,
@@ -463,7 +597,8 @@ async function loadData() {
     sb.from("program_ideas").select("*").order("created_at", { ascending:false }),
     sb.from("idea_categories").select("idea_id, category_id"),
     sb.from("program_metrics").select("*"),
-    sb.from("program_people").select("program_id, role, email")
+    sb.from("program_people").select("program_id, role, email"),
+    sb.from("suggestions").select("*").order("created_at", { ascending:false })
   ]);
   if (pRes.error) throw pRes.error;
   programs = (pRes.data||[]).map(p => ({ ...p,
@@ -494,6 +629,8 @@ async function loadData() {
   progPeople = {};
   (ppRes.error ? [] : (ppRes.data||[])).forEach(r => {
     (progPeople[r.program_id] = progPeople[r.program_id] || {})[r.role] = r.email; });
+  // 20261102000500 may not have been run yet — degrade quietly rather than error
+  suggestions = sgRes.error ? [] : (sgRes.data || []);
   const me = (session?.user?.email || "").toLowerCase();
   myEmail = me;
   myRole = (team.find(t => (t.email||"").toLowerCase() === me) || {}).role || "staff";
@@ -668,6 +805,31 @@ const setIdeaStatus = (id, status) =>
 
 const deleteIdea = id =>
   mutate(() => sb.from("program_ideas").delete().eq("id", id), "Idea removed");
+
+/* ---------- suggestions ---------- */
+async function addSuggestion(){
+  const t = val("ns-title");
+  if (!t) { toast("Say what would help, in a few words", true); return; }
+  await mutate(() => sb.from("suggestions").insert({
+    title: t, detail: val("ns-detail"), area: val("ns-area") || "portal"
+  }), "Added to the plan");
+}
+
+async function saveSuggestion(id){
+  const t = val("se-title");
+  if (!t) { toast("Give it a title", true); return; }
+  view.editSugg = null;
+  await mutate(() => sb.from("suggestions").update({
+    title: t, detail: val("se-detail"), area: val("se-area"),
+    decided_note: val("se-note")
+  }).eq("id", id));
+}
+
+const setSuggestionStatus = (id, status) =>
+  mutate(() => sb.from("suggestions").update({ status }).eq("id", id));
+
+const deleteSuggestion = id =>
+  mutate(() => sb.from("suggestions").delete().eq("id", id), "Suggestion removed");
 
 /* Scheduling turns an idea into a real program: it gets a date, a docket,
    and the idea keeps a link so the season can say where it came from. */
@@ -1083,6 +1245,101 @@ function alertsFor(p){
   return out;
 }
 
+/* The roll-up answers "how bad is it" in one line; the list below answers
+   "which programs". Counted from the same facts alertsFor reads rather than
+   by parsing its sentences, so the two cannot drift apart. */
+function alertRollup(list){
+  let noSpk=0, unconf=0, noDesc=0, late=0;
+  list.forEach(p => {
+    if (!p.program_speakers.length) noSpk++;
+    else if (!speakersOk(p)) unconf++;
+    if (!p.description) noDesc++;
+    late += lateCount(p);
+  });
+  return [[noSpk,"without speakers"],[unconf,"awaiting confirmation"],
+          [noDesc,"without a description"],
+          [late, late===1 ? "task overdue" : "tasks overdue"]]
+    .filter(r => r[0]>0).map(r => r[0]+" "+r[1]);
+}
+
+/* ================= calendar ================= */
+const calPeriod = () => { const base = calAnchor || todayUTC();
+  return calSpan==="quarter" ? quarterStart(base) : monthStart(base); };
+const evClass = p => isPast(p) ? "is-done" : (alertsFor(p).length ? "is-urgent" : "");
+
+/* One month: the grid, and under it the same programs as a list. CSS shows
+   whichever of the two fits — titles in the cells on a wide single month,
+   dots plus the list when three months share the width or it is a phone. */
+function monthBlock(m, byDate, withHead){
+  const mo=m.getUTCMonth(), lead=m.getUTCDay();
+  const daysIn = new Date(Date.UTC(m.getUTCFullYear(), mo+1, 0)).getUTCDate();
+  const from = addDays(m,-lead), today = todayUTC().getTime();
+  const narrow = calSpan==="quarter";
+  let grid = DOW.map(d => '<div class="cal-dow">'+(narrow?d.slice(0,1):d)+"</div>").join("");
+  const mine = [];
+  for (let i=0, cells=Math.ceil((lead+daysIn)/7)*7; i<cells; i++){
+    const d=addDays(from,i), out=d.getUTCMonth()!==mo;
+    const evs = out ? [] : (byDate[isoOf(d)]||[]);
+    evs.forEach(p => mine.push(p));
+    grid += '<div class="cal-d'+(out?" is-out":"")+
+      (d.getTime()===today?" is-today":"")+'"><span class="cal-dn">'+
+      d.getUTCDate()+"</span>"+
+      (evs.length
+        ? '<span class="cal-dots" aria-hidden="true">'+evs.map(p =>
+            '<span class="cal-dot '+evClass(p)+'"></span>').join("")+"</span>"+
+          evs.map(p => '<button class="cal-ev '+evClass(p)+'" data-open="'+p.id+
+            '" title="'+esc(p.title)+'">'+esc(p.title)+"</button>").join("")
+        : "")+"</div>";
+  }
+  const list = mine.length
+    ? '<div class="cal-list">'+mine.map(p => '<button class="cal-li" data-open="'+p.id+
+        '"><span class="cal-li-d '+evClass(p)+'">'+
+        esc(FMT_SHORT.format(parseISO(p.event_date)))+"</span>"+
+        '<span class="cal-li-t">'+esc(p.title)+"</span></button>").join("")+"</div>"
+    : '<p class="cal-empty">Nothing scheduled.</p>';
+  return '<section class="cal-m">'+
+    (withHead ? '<p class="cal-m-head"><span>'+esc(FMT_MON.format(m))+
+      '</span><span class="n">'+mine.length+"</span></p>" : "")+
+    '<div class="cal-grid">'+grid+"</div>"+list+"</section>";
+}
+
+function renderCalendar(){
+  const start = calPeriod();
+  const quarter = calSpan==="quarter";
+  const months = quarter ? [0,1,2].map(i => shiftMonths(start,i)) : [start];
+  const end = shiftMonths(start, months.length);
+
+  const live = programs.filter(p => !p.archived);
+  const shown = view.cat ? live.filter(p => (progCats[p.id]||[]).includes(view.cat)) : live;
+  const byDate = {};
+  shown.forEach(p => (byDate[p.event_date] = byDate[p.event_date] || []).push(p));
+  Object.keys(byDate).forEach(k => byDate[k].sort((a,b) => a.title<b.title?-1:1));
+  const inPeriod = shown.filter(p => {
+    const d=parseISO(p.event_date); return d>=start && d<end; });
+
+  const title = quarter
+    ? "Q"+(Math.floor(start.getUTCMonth()/3)+1)+" "+start.getUTCFullYear()
+    : FMT_MONTH.format(start);
+  const span = (id,label) => '<button class="seg-b'+(calSpan===id?" is-on":"")+
+    '" data-calspan="'+id+'" aria-pressed="'+(calSpan===id)+'">'+label+"</button>";
+
+  return '<div class="cal-bar"><div class="cal-nav">'+
+    '<button class="btn" data-calnav="-1" aria-label="Earlier">‹</button>'+
+    '<button class="btn" data-calnav="0">Today</button>'+
+    '<button class="btn" data-calnav="1" aria-label="Later">›</button></div>'+
+    '<h2 class="cal-title">'+esc(title)+"</h2>"+
+    '<span class="cal-sub">'+inPeriod.length+
+      (inPeriod.length===1?" program":" programs")+"</span>"+
+    '<span class="spacer"></span><div class="seg" role="group" aria-label="Calendar span">'+
+    span("month","Month")+span("quarter","Quarter")+"</div></div>"+
+    '<div class="cal-months'+(quarter?" is-q":"")+'">'+
+    months.map(m => monthBlock(m, byDate, quarter)).join("")+"</div>"+
+    '<div class="cal-legend"><span><i class="cal-key k-urgent"></i>Needs attention</span>'+
+    '<span><i class="cal-key"></i>On track</span>'+
+    '<span><i class="cal-key k-done"></i>Already run</span>'+
+    (view.cat ? '<span>filtered to '+esc(catName(view.cat))+"</span>" : "")+"</div>";
+}
+
 /* ================= render ================= */
 function render(){ app.innerHTML = view.name==="detail" ? renderDetail() : renderSeason(); wire(); }
 
@@ -1101,8 +1358,9 @@ function chrome(inner){
     '<span class="today">' + esc(FMT_FULL.format(todayUTC())) + "<br>" +
     esc(session?.user?.email||"") + '</span><div class="btn-row">' +
     nav("programs-btn","Programs", view.name==="detail" ||
-        (view.name==="season" && !["roster","team","history","ideas","analytics","assign"].includes(view.tab))) +
+        (view.name==="season" && !["roster","team","history","ideas","analytics","assign","suggestions"].includes(view.tab))) +
     nav("ideas-btn","Ideas",     view.tab==="ideas") +
+    nav("sugg-btn","Suggestions", view.tab==="suggestions") +
     nav("stats-btn","Analytics", view.tab==="analytics") +
     nav("roster-btn","Speakers", view.tab==="roster") +
     nav("assign-btn","Assignments", view.tab==="assign") +
@@ -1356,6 +1614,92 @@ function renderRunSheet(){
       : '<section class="panel"><p class="sub" style="margin:0">Preparing the run sheet…</p></section>'));
 }
 
+/* Suggestions and the build plan are one screen on purpose. Someone adds
+   a suggestion, it gets a status, and the same list is what you take to a
+   committee meeting. The status is also rendered as text, not only as the
+   <select>, because a dropdown's value does not survive printing. */
+function renderSuggestions(){
+  const shown = view.sstatus
+    ? suggestions.filter(x => x.status === view.sstatus)
+    : suggestions.filter(x => x.status !== "declined");   // declined stay out of the way
+
+  const counts = {};
+  SUGG_STATUS.forEach(o => counts[o.id] = suggestions.filter(x => x.status === o.id).length);
+
+  const filter = '<div class="cat-filter">' + SUGG_STATUS.map(o =>
+      '<button class="chip-t'+(view.sstatus===o.id?" is-on":"")+'" data-sstat="'+o.id+'">'+
+      esc(o.label)+' <span style="opacity:.6">'+counts[o.id]+"</span></button>").join("") +
+    (view.sstatus ? '<button class="chip-t" data-sstat="">Show open items</button>' : "") +
+    "</div>";
+
+  const rows = shown.length ? shown.map(x =>
+    '<section class="panel" style="margin-bottom:.85rem">' +
+      '<div class="sp-row" style="border:none;padding:0"><div>' +
+        '<div class="sp-name" style="font-size:1.05rem">'+esc(x.title)+"</div>" +
+        (x.detail ? '<p class="sub" style="margin:.3rem 0 0;max-width:60ch">'+
+          esc(x.detail)+"</p>" : "") +
+        (x.decided_note ? '<p class="sub" style="margin:.35rem 0 0;max-width:60ch">'+
+          "<b>Where it stands: </b>"+esc(x.decided_note)+"</p>" : "") +
+        '<div class="cat-tags" style="margin-top:.45rem">' +
+          '<span class="cat-tag">'+esc(suggAreaLabel(x.area))+"</span>" +
+          '<span class="cat-tag">'+esc(suggStatusLabel(x.status))+"</span></div>" +
+        '<div class="sp-meta" style="margin-top:.4rem">suggested by '+
+          esc(personLabel(x.submitted_by) || "someone")+"</div>" +
+      "</div>" +
+      '<div style="display:flex;gap:.4rem;align-items:flex-start">' +
+        '<select data-sstatus="'+x.id+'" aria-label="Where it stands">' +
+          SUGG_STATUS.map(o => '<option value="'+o.id+'"'+
+            (o.id===x.status?" selected":"")+">"+esc(o.label)+"</option>").join("") +
+        "</select>" +
+        '<button class="btn" data-sedit="'+x.id+'">Edit</button>' +
+        '<button class="btn" data-sdel="'+x.id+'" data-t="'+esc(x.title)+'">Delete</button>' +
+      "</div></div>" +
+      (view.editSugg === x.id ? suggestionForm(x) : "") +
+    "</section>").join("") : '<p class="empty-note">Nothing here yet.</p>';
+
+  return chrome(
+    '<button class="back" data-back>\u2190 All programs</button>' +
+    '<h2 style="font-size:1.4rem;margin:0 0 .3rem">Suggestions and the build plan</h2>' +
+    '<p class="sub" style="color:var(--muted);margin:0 0 1.1rem;max-width:70ch">' +
+    "Anything that would make this easier \u2014 the portal, how we work, or a document " +
+    "that ought to exist. Ideas for future <i>programs</i> belong in Ideas instead. " +
+    "The status says where something sits, so this list is also the plan.</p>" + filter +
+    '<section class="panel" style="margin-bottom:1.5rem">' +
+      '<p class="panel-head"><span>Add a suggestion</span>' +
+      "<span>a title is enough to start</span></p>" +
+      '<div class="form"><div class="field">' +
+      '<label class="field-label" for="ns-title">What would help?</label>' +
+      '<input type="text" id="ns-title" placeholder="In a few words"></div>' +
+      '<div class="field"><label class="field-label" for="ns-detail">Any detail</label>' +
+      '<textarea id="ns-detail" placeholder="What is awkward now, and what would be ' +
+      'better"></textarea></div>' +
+      '<div class="field"><label class="field-label" for="ns-area">What is it about?</label>' +
+      '<select id="ns-area">' + SUGG_AREAS.map(a =>
+        '<option value="'+a.id+'">'+esc(a.label)+"</option>").join("") + "</select></div>" +
+      '<div class="form-actions">' +
+      '<button class="btn primary" id="ns-add">Add suggestion</button>' +
+      "</div></div></section>" + rows);
+}
+
+function suggestionForm(x){
+  return '<div class="form" style="margin-top:.8rem;padding-top:.8rem;' +
+    'border-top:1px solid var(--rule)">' +
+    '<div class="field"><label class="field-label" for="se-title">Title</label>' +
+    '<input type="text" id="se-title" value="'+esc(x.title)+'"></div>' +
+    '<div class="field"><label class="field-label" for="se-detail">Detail</label>' +
+    "<textarea id=\"se-detail\">"+esc(x.detail)+"</textarea></div>" +
+    '<div class="form-row">' +
+    '<div class="field"><label class="field-label" for="se-area">What it is about</label>' +
+    '<select id="se-area">' + SUGG_AREAS.map(a =>
+      '<option value="'+a.id+'"'+(a.id===x.area?" selected":"")+">"+esc(a.label)+
+      "</option>").join("") + "</select></div>" +
+    '<div class="field"><label class="field-label" for="se-note">Where it stands</label>' +
+    '<input type="text" id="se-note" value="'+esc(x.decided_note)+
+    '" placeholder="Why it is planned, or why not"></div></div>' +
+    '<div class="form-actions"><button class="btn primary" id="se-save" data-id="'+x.id+
+    '">Save</button><button class="btn" id="se-cancel">Cancel</button></div></div>';
+}
+
 function renderIdeas(){
   const shown = view.istatus
     ? ideas.filter(i => i.status === view.istatus)
@@ -1552,6 +1896,7 @@ function renderSeason(){
   if (view.tab==="assign") return renderAssign();
   if (view.tab==="team") return renderTeam();
   if (view.tab==="ideas") return renderIdeas();
+  if (view.tab==="suggestions") return renderSuggestions();
   if (view.tab==="analytics") return renderAnalytics();
   if (view.tab==="runsheet") return renderRunSheet();
   if (view.tab==="roster") return view.speakerId ? renderSpeaker() : renderRoster();
@@ -1573,8 +1918,19 @@ function renderSeason(){
       '</span><button class="a-go" data-open="'+p.id+'">Open →</button></div>';
   }).filter(Boolean);
 
-  const alerts = rows.length ? '<section class="alerts"><p class="alerts-head">Needs attention — '+
-    rows.length+" of "+upcoming.length+" upcoming programs</p>"+rows.join("")+"</section>" : "";
+  const roll = alertRollup(upcoming.filter(p => alertsFor(p).length));
+  const alerts = rows.length
+    ? '<section class="alerts"><button class="alerts-roll" id="alerts-roll" aria-expanded="'+
+      alertsOpen+'" aria-controls="alerts-list">'+
+      '<span class="ar-caret" aria-hidden="true">▶</span>'+
+      '<span class="ar-head">Needs attention</span>'+
+      '<span class="ar-count">'+rows.length+" of "+upcoming.length+
+        " upcoming programs</span>"+
+      '<span class="ar-chips">'+roll.map(t =>
+        '<span class="ar-chip">'+esc(t)+"</span>").join("")+"</span></button>"+
+      '<div class="alerts-list" id="alerts-list"'+(alertsOpen?"":" hidden")+">"+
+      rows.join("")+"</div></section>"
+    : "";
 
   const tab=(id,label,n)=>'<button class="tab" role="tab" data-tab="'+id+'" aria-selected="'+
     (view.tab===id)+'">'+label+'<span class="count">'+n+"</span></button>";
@@ -1586,11 +1942,23 @@ function renderSeason(){
       (view.cat ? '<button class="chip-t" data-catfilter="">Clear</button>' : "") + "</div>"
     : "";
 
+  /* Cards or calendar. The upcoming/completed tabs are a filter on a list and
+     mean nothing against a calendar, whose period is its own filter, so in
+     calendar mode the toggle stands in for them. */
+  const lay = (id,label) => '<button class="seg-b'+(layout===id?" is-on":"")+
+    '" data-layout="'+id+'" aria-pressed="'+(layout===id)+'">'+label+"</button>";
+  const seg = '<div class="seg" role="group" aria-label="How to show the season">'+
+    lay("cards","Cards")+lay("calendar","Calendar")+"</div>";
+  const newBtn = '<button class="btn primary" id="new-program">+ New program</button>';
+
+  if (layout==="calendar")
+    return chrome(alerts + '<div class="tabs">'+seg+'<span class="spacer"></span>'+
+      newBtn+"</div>" + filter + renderCalendar());
+
   return chrome(alerts + '<div class="tabs" role="tablist">' +
     tab("upcoming","Upcoming",upcoming.length)+tab("past","Completed",past.length)+
     tab("all","All",live.length)+tab("catalog","Catalogue",shelf.length)+
-    '<span class="spacer"></span>'+
-    '<button class="btn primary" id="new-program">+ New program</button></div>' + filter +
+    '<span class="spacer"></span>'+seg+newBtn+"</div>" + filter +
     '<div class="grid">'+shown.map(card).join("")+"</div>");
 }
 
@@ -2052,6 +2420,17 @@ function wire(){
            istatus:null, editIdea:null, editStats:false };
     render(); window.scrollTo(0,0);
   });
+  document.getElementById("sugg-btn")?.addEventListener("click", ()=>{
+    view={ name:"season", tab:"suggestions", id:null, speakerId:null, q:"", cat:null,
+           stype:null, edit:false, editSpeaker:null, editRoster:false, creating:false,
+           sstatus:null, editSugg:null, editStats:false };
+    render(); window.scrollTo(0,0);
+  });
+  document.getElementById("ns-add")?.addEventListener("click", addSuggestion);
+  document.getElementById("se-save")?.addEventListener("click", ()=>
+    saveSuggestion(document.getElementById("se-save").getAttribute("data-id")));
+  document.getElementById("se-cancel")?.addEventListener("click", ()=>{
+    view={ ...view, editSugg:null }; render(); });
   document.getElementById("ni-add")?.addEventListener("click", addIdea);
   document.getElementById("ie-save")?.addEventListener("click", ()=>
     saveIdea(document.getElementById("ie-save").getAttribute("data-id")));
@@ -2109,6 +2488,19 @@ function wire(){
   });
   on("[data-tab]","click",el=>{
     view={ ...view, name:"season", tab:el.getAttribute("data-tab"), id:null, creating:false }; render(); });
+
+  document.getElementById("alerts-roll")?.addEventListener("click", ()=>{
+    alertsOpen = !alertsOpen; setPref("alertsOpen", alertsOpen ? "1" : "0"); render(); });
+  on("[data-layout]","click",el=>{
+    layout = el.getAttribute("data-layout")==="calendar" ? "calendar" : "cards";
+    setPref("layout",layout); render(); window.scrollTo(0,0); });
+  on("[data-calspan]","click",el=>{
+    calSpan = el.getAttribute("data-calspan")==="quarter" ? "quarter" : "month";
+    setPref("calSpan",calSpan); render(); });
+  on("[data-calnav]","click",el=>{
+    const n = Number(el.getAttribute("data-calnav")) || 0;
+    calAnchor = n===0 ? null : shiftMonths(calPeriod(), n*(calSpan==="quarter"?3:1));
+    render(); });
   on("[data-back]","click",()=>{
     view={ ...view, name:"season", id:null, edit:false, editSpeaker:null, creating:false };
     render(); window.scrollTo(0,0); });
@@ -2163,6 +2555,16 @@ function wire(){
   on("[data-idel]","click",el=>{
     if (confirm("Delete the idea \"" + el.getAttribute("data-t") + "\"?"))
       deleteIdea(el.getAttribute("data-idel")); });
+
+  on("[data-sstat]","click",el=>{
+    view={ ...view, sstatus: el.getAttribute("data-sstat") || null }; render(); });
+  on("[data-sstatus]","change",el=>
+    setSuggestionStatus(el.getAttribute("data-sstatus"), el.value));
+  on("[data-sedit]","click",el=>{
+    view={ ...view, editSugg: el.getAttribute("data-sedit") }; render(); });
+  on("[data-sdel]","click",el=>{
+    if (confirm("Delete the suggestion \"" + el.getAttribute("data-t") + "\"?"))
+      deleteSuggestion(el.getAttribute("data-sdel")); });
 
   on("[data-runsheet]","click",(el,e)=>{ e?.stopPropagation?.();
     openRunSheet(el.getAttribute("data-runsheet")); });

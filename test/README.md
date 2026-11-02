@@ -45,6 +45,29 @@ Assertions here look for markup in context — `class="card"` followed by
 "Student Loans" passed for weeks while the card rendered no tags at all,
 because the filter chips contain the same words.
 
+    node test/calendar.js
+
+Covers the two things asked for on 2 November 2026: the "Needs attention"
+roll-up and the month/quarter calendar.
+
+Both are easy to test wrongly. An alert row is in the markup whether the
+panel is open or shut, and a program title is on the page whether or not
+it reached the calendar — the cards print it too. So every assertion cuts
+out the one element it is about first: the roll-up `<button>`, the
+`alerts-list` div, or a single month's `<section class="cal-m">`.
+
+The clock is pinned (`todayUTC` is reassigned to 2 Nov 2026) because
+"today is marked once", "two of four upcoming" and which programs fall in
+Q4 all move with the real date. The fixture deliberately holds a program
+either side of the period on show, an archived one, and one of each
+condition the roll-up counts.
+
+Note that the day cells, the dots and the per-month list are all rendered
+every time; CSS decides which of the three a given width shows. A test
+that asserted "the titles are in the cells" would therefore pass on a
+phone where they are invisible — hence the separate assertions that the
+list exists and that the dots do.
+
     node test/kinds.js
 
 Covers the eleven program types NACBA runs, added 2 November 2026 at
