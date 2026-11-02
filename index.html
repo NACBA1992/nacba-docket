@@ -244,6 +244,8 @@
   td.c-assign{white-space:nowrap}
   td.c-assign select{font-size:.82rem;max-width:11rem}
   .by-hand{margin-left:.3rem;color:var(--accent)}
+  th .pp-all{display:block;margin-top:.3rem;font-weight:400;font-size:.78rem;max-width:11rem}
+  table.pk td select.conf{font-size:.82rem;max-width:11rem}
   tr.done td.c-task{color:var(--faint);text-decoration:line-through;text-decoration-thickness:1px}
   tr.done td.c-off{color:var(--faint)}
   tr.late td.c-date{color:var(--critical);font-weight:600}
@@ -317,6 +319,16 @@ const ACCESS_ROLES = [
   { id:"staff",       label:"Staff",         note:"General access" }
 ];
 const roleLabel = r => (ACCESS_ROLES.find(x => x.id === r) || {}).label || r;
+// Roles a PROGRAM can have someone in. Separate from ACCESS_ROLES above,
+// which is about what you may change in the portal — 'admin' has no place
+// here. Adding a role is this one line plus nothing else; it only starts
+// assigning work once docket_template has a task whose owner_role matches.
+const PROGRAM_ROLES = [
+  { id:"coordinator", label:"Coordinator", note:"Runs the program day to day" },
+  { id:"moderator",   label:"Moderator",   note:"Hosts the live session" },
+  { id:"marketing",   label:"Marketing",   note:"Graphics and promotion" },
+  { id:"emc_chair",   label:"EMC Chair",   note:"Education Committee chair" }
+];
 // NACBA's own programme types, in the order Rachael listed them.
 // `paid` stays the default and keeps its id — see the program_types migration
 // for why the old ids are reused rather than renamed. `vendor` must keep its
@@ -397,7 +409,7 @@ const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 
 let session=null, programs=[], roster=[], history=[], links={}, uploads={},
-    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, busy=false;
+    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, progPeople={}, busy=false;
 let view = { name:"season", tab:"upcoming", id:null, edit:false, editSpeaker:null,
   creating:false, cat:null, speakerId:null, q:"", stype:null, editRoster:false,
   istatus:null, editIdea:null, editStats:false };
@@ -427,10 +439,9 @@ function renderGate(msg, kind) {
 
 /* ================= data ================= */
 async function loadData() {
-  const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes] = await Promise.all([
+  const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes, ppRes] = await Promise.all([
     sb.from("programs").select(`id, slug, event_date, title, description, note, kind,
       archived, venue, location, store_url, recording_url,
-      coordinator_email, moderator_email,
       program_speakers ( id, topic, confirmation, sort_order,
         speakers ( id, full_name, preferred_title, firm, address, email, phone, pronunciation,
                    headshot_location, bio_location, speaker_type, name_audio_at ),
@@ -451,7 +462,8 @@ async function loadData() {
     sb.from("allowed_emails").select("email, role, full_name, title, added_at").order("email"),
     sb.from("program_ideas").select("*").order("created_at", { ascending:false }),
     sb.from("idea_categories").select("idea_id, category_id"),
-    sb.from("program_metrics").select("*")
+    sb.from("program_metrics").select("*"),
+    sb.from("program_people").select("program_id, role, email")
   ]);
   if (pRes.error) throw pRes.error;
   programs = (pRes.data||[]).map(p => ({ ...p,
@@ -478,6 +490,10 @@ async function loadData() {
     (ideaCats[r.idea_id] = ideaCats[r.idea_id] || []).push(r.category_id); });
   metrics = {};
   (mRes.error ? [] : (mRes.data||[])).forEach(m => { metrics[m.program_id] = m; });
+  // 20261102000400 may not have been run yet — degrade quietly rather than error
+  progPeople = {};
+  (ppRes.error ? [] : (ppRes.data||[])).forEach(r => {
+    (progPeople[r.program_id] = progPeople[r.program_id] || {})[r.role] = r.email; });
   const me = (session?.user?.email || "").toLowerCase();
   myEmail = me;
   myRole = (team.find(t => (t.email||"").toLowerCase() === me) || {}).role || "staff";
@@ -746,12 +762,37 @@ const personOptions = (selected, blank) =>
     ((selected||"").toLowerCase() === (t.email||"").toLowerCase() ? " selected" : "")+
     ">"+esc(t.full_name || t.email)+"</option>").join("");
 
-const inheritedAssignee = (p, t) => {
-  const r = (t.owner_role||"").trim().toLowerCase();
-  if (r === "coordinator") return p.coordinator_email || "";
-  if (r === "moderator")   return p.moderator_email   || "";
-  return "";
-};
+const personFor = (programId, role) => (progPeople[programId] || {})[role] || "";
+
+const inheritedAssignee = (p, t) =>
+  personFor(p.id, (t.owner_role||"").trim().toLowerCase());
+
+/* Upcoming and live, soonest first — the set the bulk screen works on. */
+const assignable = () => programs
+  .filter(p => !p.archived && !isPast(p))
+  .sort((a,b) => a.event_date < b.event_date ? -1 : 1);
+
+const setProgramPerson = (programId, role, email) =>
+  mutate(() => sb.from("program_people")
+    .upsert({ program_id: programId, role, email }, { onConflict: "program_id,role" }));
+
+/* One person into one role across every upcoming program. Confirmed, because
+   it writes a row for each. Tasks pinned by hand are left alone — the
+   re-cascade trigger skips anything with assignee_set. */
+async function setRoleForAll(role, email){
+  const live = assignable();
+  const label = (PROGRAM_ROLES.find(r => r.id === role) || {}).label || role;
+  if (!live.length) { toast("No upcoming programs to set", true); return; }
+  if (!confirm("Set "+personLabel(email)+" as "+label+" on all "+live.length+
+               " upcoming programs?\n\n"+
+               "Any task you assigned by hand keeps the person you chose.")) {
+    render(); return;                   // put the dropdown back as it was
+  }
+  await mutate(() => sb.from("program_people").upsert(
+    live.map(p => ({ program_id: p.id, role, email })),
+    { onConflict: "program_id,role" }),
+    label+" set on "+live.length+" programs");
+}
 
 const assignCell = t =>
   '<select class="conf" data-assign="'+t.id+'" aria-label="Assigned to">'+
@@ -1060,10 +1101,11 @@ function chrome(inner){
     '<span class="today">' + esc(FMT_FULL.format(todayUTC())) + "<br>" +
     esc(session?.user?.email||"") + '</span><div class="btn-row">' +
     nav("programs-btn","Programs", view.name==="detail" ||
-        (view.name==="season" && !["roster","team","history","ideas","analytics"].includes(view.tab))) +
+        (view.name==="season" && !["roster","team","history","ideas","analytics","assign"].includes(view.tab))) +
     nav("ideas-btn","Ideas",     view.tab==="ideas") +
     nav("stats-btn","Analytics", view.tab==="analytics") +
     nav("roster-btn","Speakers", view.tab==="roster") +
+    nav("assign-btn","Assignments", view.tab==="assign") +
     nav("team-btn","Team",       view.tab==="team") +
     '<button class="btn" id="signout">Sign out</button></div></div></header>' + inner +
     '<footer><span>' + live + " live · " + shelf + " in the catalogue · " +
@@ -1410,6 +1452,49 @@ function ideaForm(i){
     '">Save</button><button class="btn" id="ie-cancel">Cancel</button></div></div>';
 }
 
+/* Bulk assignment: programs down, roles across. The point is to set a whole
+   season without opening each program one at a time, and to see the gaps. */
+function renderAssign(){
+  const live = assignable();
+  if (!live.length)
+    return chrome('<section class="panel"><p class="panel-head"><span>Assignments</span>'+
+      "</p><div class=\"callout-note\">No upcoming programs. This screen covers live "+
+      "programs that have not happened yet.</div></section>");
+
+  const gaps = live.reduce((n,p) =>
+    n + PROGRAM_ROLES.filter(r => !personFor(p.id, r.id)).length, 0);
+
+  const head = '<tr><th class="n">Program</th>'+
+    PROGRAM_ROLES.map(r =>
+      "<th>"+esc(r.label)+
+      '<select class="conf pp-all" data-ppall="'+r.id+
+      '" aria-label="Set the '+esc(r.label)+' for every program below">'+
+      '<option value="">set all…</option>'+
+      team.map(t => '<option value="'+esc(t.email)+'">'+
+        esc(t.full_name||t.email)+"</option>").join("")+
+      "</select></th>").join("")+"</tr>";
+
+  const rows = live.map(p =>
+    '<tr><td class="n"><b>'+esc(FMT_SHORT.format(parseISO(p.event_date)))+"</b><br>"+
+    '<span class="sp-meta">'+esc(p.title)+"</span></td>"+
+    PROGRAM_ROLES.map(r =>
+      '<td><select class="conf" data-pp="'+p.id+"|"+r.id+
+      '" aria-label="'+esc(r.label+" for "+p.title)+'">'+
+      personOptions(personFor(p.id, r.id), "— nobody —")+
+      "</select></td>").join("")+"</tr>").join("");
+
+  return chrome('<section class="panel"><p class="panel-head"><span>Assignments</span>'+
+    "<span>"+live.length+" upcoming · "+
+    (gaps ? gaps+" still to fill" : "all filled")+"</span></p>"+
+    '<p class="sub" style="margin:0 0 .6rem;font-size:.85rem;color:var(--faint)">'+
+    "Each program’s docket tasks follow whoever holds the matching role here, "+
+    "except any task assigned by hand. Marketing and the EMC Chair can be named "+
+    "now, but no docket task is owned by those roles yet, so naming them records "+
+    "the contact without handing over work.</p>"+
+    '<div class="pk-scroll"><table class="pk"><thead>'+head+"</thead><tbody>"+
+    rows+"</tbody></table></div></section>");
+}
+
 function renderTeam(){
   const admin = myRole === "admin";
   const adminCount = team.filter(t => t.role === "admin").length;
@@ -1464,6 +1549,7 @@ function renderTeam(){
 
 function renderSeason(){
   if (view.creating) return chrome(newProgramForm());
+  if (view.tab==="assign") return renderAssign();
   if (view.tab==="team") return renderTeam();
   if (view.tab==="ideas") return renderIdeas();
   if (view.tab==="analytics") return renderAnalytics();
@@ -1747,15 +1833,15 @@ function editProgramForm(p){
     '<div class="field"><label class="field-label" for="ep-rec">Recording link</label>'+
     '<input type="text" id="ep-rec" value="'+esc(p.recording_url||"")+'"></div></div>'+
     '<div class="form-row">'+
-    '<div class="field"><label class="field-label" for="ep-coord">Coordinator</label>'+
-    '<select id="ep-coord">'+personOptions(p.coordinator_email, "— nobody yet —")+
-    "</select></div>"+
-    '<div class="field"><label class="field-label" for="ep-mod">Moderator</label>'+
-    '<select id="ep-mod">'+personOptions(p.moderator_email, "— nobody yet —")+
-    "</select></div></div>"+
+    PROGRAM_ROLES.map(r =>
+      '<div class="field"><label class="field-label" for="ep-pp-'+r.id+'">'+esc(r.label)+
+      '</label><select id="ep-pp-'+r.id+'">'+
+      personOptions(personFor(p.id, r.id), "— nobody —")+
+      "</select></div>").join("")+"</div>"+
     '<p class="sub" style="margin:-.4rem 0 0;font-size:.85rem;color:var(--faint)">'+
-    "Docket tasks owned by a Coordinator or Moderator follow these two. Any task "+
-    "you assigned by hand keeps the person you chose.</p>"+
+    "Docket tasks follow whoever holds the matching role. Any task you assigned "+
+    "by hand keeps the person you chose. To set these across a whole season at "+
+    "once, use Assignments.</p>"+
     '<label class="field-label" style="display:flex;align-items:center;gap:.5rem;'+
       'text-transform:none;font-size:.92rem;color:var(--ink);cursor:pointer">'+
     '<input type="checkbox" id="ep-archived" style="width:15px;height:15px;accent-color:var(--accent)"'+
@@ -1882,14 +1968,19 @@ async function saveProgram(id){
   const date=val("ep-date"), title=val("ep-title");
   if (!date || !title) { toast("Date and title are both required", true); return; }
   view.edit=false;
-  await mutate(()=>sb.from("programs").update({
-    event_date: date, title, kind: val("ep-kind") || "paid",
-    description: val("ep-desc"), note: val("ep-note"),
-    venue: val("ep-venue"), location: val("ep-loc"),
-    store_url: val("ep-store"), recording_url: val("ep-rec"),
-    coordinator_email: val("ep-coord"), moderator_email: val("ep-mod"),
-    archived: !!document.getElementById("ep-archived")?.checked
-  }).eq("id",id));
+  await mutate(async ()=>{
+    const a = await sb.from("programs").update({
+      event_date: date, title, kind: val("ep-kind") || "paid",
+      description: val("ep-desc"), note: val("ep-note"),
+      venue: val("ep-venue"), location: val("ep-loc"),
+      store_url: val("ep-store"), recording_url: val("ep-rec"),
+      archived: !!document.getElementById("ep-archived")?.checked
+    }).eq("id",id);
+    if (a.error) return a;
+    return await sb.from("program_people").upsert(
+      PROGRAM_ROLES.map(r => ({ program_id:id, role:r.id, email: val("ep-pp-"+r.id) })),
+      { onConflict: "program_id,role" });
+  });
 }
 
 async function saveSpeaker(speakerId, psId){
@@ -1977,6 +2068,11 @@ function wire(){
   });
   document.getElementById("team-btn")?.addEventListener("click", ()=>{
     view={ name:"season", tab:"team", id:null, edit:false, editSpeaker:null,
+           creating:false, cat:view.cat };
+    render(); window.scrollTo(0,0);
+  });
+  document.getElementById("assign-btn")?.addEventListener("click", ()=>{
+    view={ name:"season", tab:"assign", id:null, edit:false, editSpeaker:null,
            creating:false, cat:view.cat };
     render(); window.scrollTo(0,0);
   });
@@ -2114,6 +2210,13 @@ function wire(){
   on("[data-conf]","change",el=>setConf(el.getAttribute("data-conf"), el.value));
   on("[data-task]","change",el=>setTask(el.getAttribute("data-task"), el.checked));
   on("[data-assign]","change",el=>setTaskAssignee(el.getAttribute("data-assign"), el.value));
+  on("[data-pp]","change",el=>{
+    const [pid,role]=(el.getAttribute("data-pp")||"").split("|");
+    if (pid && role) setProgramPerson(pid, role, el.value);
+  });
+  on("[data-ppall]","change",el=>{
+    if (el.value) setRoleForAll(el.getAttribute("data-ppall"), el.value);
+  });
   on("[data-deliv]","change",el=>setDeliv(el.getAttribute("data-deliv"), el.checked));
 }
 
