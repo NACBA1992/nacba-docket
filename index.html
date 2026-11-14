@@ -144,6 +144,19 @@
     background:none;border:none;padding:0;white-space:nowrap}
   .a-go:hover{text-decoration:underline}
 
+  /* Arrivals are good news. They sit where the alerts sit and must not borrow
+     their red: something a speaker sent in is not a problem to be fixed. */
+  .arr{display:grid;grid-template-columns:5.5rem 1fr auto auto;gap:0 1rem;
+    align-items:center;padding:.6rem .9rem;background:var(--surface);
+    border-left:3px solid var(--brand);border-radius:0 3px 3px 0;margin-bottom:2px}
+  .arr-date{font-size:.84rem;font-weight:600;color:var(--accent);white-space:nowrap}
+  .arr-text{font-size:.92rem}
+  .arr-how{color:var(--faint)}
+  .arr-acts{display:flex;gap:.4rem;white-space:nowrap}
+  .arr-go{font-size:.84rem;font-weight:600;color:var(--accent);background:none;
+    border:none;padding:0 0 0 .6rem;white-space:nowrap}
+  .arr-go:hover{text-decoration:underline}
+
   /* The roll-up. Collapsed by default: the counts say how bad it is without
      pushing every program card below the fold. Open it for the which-and-why. */
   .alerts-roll{width:100%;display:flex;flex-wrap:wrap;gap:.35rem .7rem;align-items:center;
@@ -330,6 +343,30 @@
     border-radius:2px;white-space:nowrap}
   .chip-ok{background:var(--ok-soft);color:var(--ok)}
   .chip-warn{background:var(--warn-soft);color:var(--warn)}
+  .chip-crit{background:var(--critical-soft);color:var(--critical)}
+  .chip-new{background:var(--accent);color:#fff;font-weight:700}
+
+  /* ---- what speakers have actually sent ---- */
+  .sub-row{border-top:1px solid var(--rule);padding:.8rem 0}
+  .sub-row:first-of-type{border-top:none;padding-top:0}
+  .sub-head{display:flex;justify-content:space-between;align-items:baseline;
+    gap:1rem;flex-wrap:wrap}
+  .sub-items{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.5rem}
+  .sub-item{border:1px solid var(--rule);border-radius:3px;padding:.4rem .55rem;
+    font-size:.82rem;line-height:1.35;min-width:9.5rem;background:var(--surface-2)}
+  .sub-item.has{border-color:var(--ok);background:var(--ok-soft)}
+  .sub-item.missing{border-color:var(--rule);opacity:.75}
+  .sub-item.unticked{border-color:var(--warn);background:var(--warn-soft)}
+  .sub-it-label{font-weight:600;display:flex;align-items:center;gap:.3rem}
+  .sub-it-meta{color:var(--muted);font-size:.78rem;margin-top:.15rem;
+    word-break:break-word}
+  .sub-acts{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.3rem}
+  .sub-bar{display:flex;justify-content:space-between;align-items:center;
+    gap:1rem;flex-wrap:wrap;margin-bottom:.9rem;padding:.6rem .75rem;
+    background:var(--accent-soft);border-radius:3px;font-size:.88rem;
+    color:var(--accent);font-weight:600}
+  .pk td.ev{position:relative}
+  .pk .ev-mark{color:var(--warn);font-weight:700;margin-left:.15rem}
   .empty-note{color:var(--critical);font-style:italic;font-size:.93rem;margin:0 0 .5rem}
   .note-row{border-top:1px solid var(--rule);padding-top:.65rem;margin-top:.35rem;
     font-size:.88rem;color:var(--warn);line-height:1.5}
@@ -403,6 +440,8 @@
     body{padding:0 1rem 4rem} header.masthead{padding-top:2rem}
     .masthead-right{align-items:flex-start}
     .alert{grid-template-columns:1fr;gap:.3rem} .a-go{justify-self:start}
+    .arr{grid-template-columns:1fr;gap:.3rem}
+    .arr-acts,.arr-go{justify-self:start} .arr-go{padding-left:0}
     /* Stacked, the box must still fill the width: a column flex container
        set to flex-start would otherwise leave it at a textarea's default. */
     .sc-add{flex-direction:column;align-items:stretch}
@@ -536,7 +575,13 @@ const FIELD_NAMES = {
   confirmation:"confirmation", topic:"topic", full_name:"name", email:"email",
   firm:"firm", preferred_title:"preferred title", pronunciation:"pronunciation",
   headshot_location:"headshot location", bio_location:"bio location", phone:"phone",
-  added:"added", removed:"removed", confirmed_on:"confirmed on", kind:"type", archived:"archived"
+  added:"added", removed:"removed", confirmed_on:"confirmed on", kind:"type", archived:"archived",
+  /* The bytes of headshot and name_audio are not logged at all — see
+     20261114000100_log_no_bytes.sql. These companion columns are what the
+     change history shows when a speaker sends something in. */
+  headshot_at:"headshot", headshot_mime:"headshot format",
+  name_audio_at:"name recording", bio:"biography", bio_short:"short biography",
+  bio_updated_by:"who wrote the bio", linkedin:"LinkedIn"
 };
 
 const DAY = 86400000;
@@ -564,7 +609,7 @@ const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 
 let session=null, programs=[], roster=[], history=[], links={}, uploads={},
-    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, progPeople={}, suggestions=[], suggComments={}, busy=false;
+    categories=[], progCats={}, spkCats={}, team=[], myRole="staff", myEmail="", ideas=[], ideaCats={}, metrics={}, runSheet={}, progPeople={}, suggestions=[], suggComments={}, bios={}, busy=false;
 let view = { name:"season", tab:"upcoming", id:null, edit:false, editSpeaker:null,
   creating:false, cat:null, speakerId:null, q:"", stype:null, editRoster:false,
   istatus:null, editIdea:null, editStats:false };
@@ -607,7 +652,7 @@ function renderGate(msg, kind) {
 /* ================= data ================= */
 async function loadData() {
   const [pRes, sRes, lRes, uRes, cRes, pcRes, scRes, tRes, iRes, icRes, mRes, ppRes, sgRes,
-         sgcRes] = await Promise.all([
+         sgcRes, bRes] = await Promise.all([
     sb.from("programs").select(`id, slug, event_date, title, description, note, kind,
       archived, venue, location, store_url, recording_url,
       program_speakers ( id, topic, confirmation, sort_order,
@@ -633,7 +678,16 @@ async function loadData() {
     sb.from("program_metrics").select("*"),
     sb.from("program_people").select("program_id, role, email"),
     sb.from("suggestions").select("*").order("created_at", { ascending:false }),
-    sb.from("suggestion_comments").select("*").order("created_at")
+    sb.from("suggestion_comments").select("*").order("created_at"),
+    /* What the speaker wrote about themselves, and whether a headshot is on
+       file. Deliberately a separate query, and deliberately never selecting
+       speakers.headshot: the bytes are up to 10 MB each and would be pulled
+       on every load. headshot_at is the presence flag; the bytes come down
+       one at a time through speaker_headshot() when someone asks for them.
+       Separate rather than folded into the programs select so that a project
+       without 20261102000200_bio_builder degrades quietly instead of
+       throwing and taking the whole app down. */
+    sb.from("speakers").select("id, headshot_at, headshot_mime, bio, bio_short, bio_updated_at, bio_updated_by, linkedin")
   ]);
   if (pRes.error) throw pRes.error;
   programs = (pRes.data||[]).map(p => ({ ...p,
@@ -653,6 +707,8 @@ async function loadData() {
     (progCats[r.program_id] = progCats[r.program_id] || []).push(r.category_id); });
   (scRes.error ? [] : (scRes.data||[])).forEach(r => {
     (spkCats[r.speaker_id] = spkCats[r.speaker_id] || []).push(r.category_id); });
+  bios = {};
+  (bRes.error ? [] : (bRes.data||[])).forEach(b => { bios[b.id] = b; });
   team = tRes.error ? [] : (tRes.data || []);
   ideas = iRes.error ? [] : (iRes.data || []);
   ideaCats = {};
@@ -1094,6 +1150,68 @@ async function downloadUpload(id, fallbackName) {
   } catch (e) { toast("Could not decode that file", true); }
 }
 
+/* The headshot and the bio were reachable only by opening each packet. Both
+   are read here the same way the file downloads already work: the bytes come
+   down one speaker at a time through speaker_headshot(), which is why
+   speakers.headshot is never in a list query. */
+const nameSlug = n => String(n||"speaker").trim()
+  .replace(/,\s*Esq\.$/i,"").replace(/[^A-Za-z0-9]+/g,"-")
+  .replace(/^-+|-+$/g,"") || "speaker";
+
+const saveBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+};
+
+async function downloadHeadshot(sid, name){
+  toast("Fetching the headshot\u2026");
+  const { data, error } = await sb.rpc("speaker_headshot", { sid });
+  if (error)    { toast("Could not fetch that headshot", true); return; }
+  if (!data?.ok){ toast(data?.error || "No headshot on file", true); return; }
+  try {
+    const bin = atob(data.b64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const ext = ({ "image/jpeg":"jpg", "image/png":"png", "image/webp":"webp" })[data.mime] || "jpg";
+    saveBlob(new Blob([buf], { type: data.mime }), nameSlug(name)+"-headshot."+ext);
+    toast("Headshot downloaded \u2014 "+kb(buf.length)+", as the speaker sent it");
+  } catch (e) { toast("Could not decode that headshot", true); }
+}
+
+/* Bio text, for dropping into a promo graphic. Copy is the common case;
+   the .txt is there for when several bios are being collected at once. */
+function bioText(sid, which){
+  const b = bios[sid] || {};
+  if (which === "short") return (b.bio_short||"").trim();
+  if (which === "full")  return (b.bio||"").trim();
+  const name = (roster.find(r => r.id===sid)||{}).full_name || "";
+  const parts = [name];
+  if (b.linkedin) parts.push(b.linkedin);
+  parts.push("", "SHORT BIO ("+words(b.bio_short)+" words)", (b.bio_short||"").trim() || "\u2014",
+             "", "FULL BIO ("+words(b.bio)+" words)", (b.bio||"").trim() || "\u2014");
+  if (b.bio_updated_at) parts.push("", "Last saved "+FMT_LOG.format(new Date(b.bio_updated_at))+
+    " by "+(b.bio_updated_by === "staff" ? "staff" : "the speaker"));
+  return parts.join("\n");
+}
+
+async function copyBio(sid, which){
+  const t = bioText(sid, which);
+  if (!t) { toast("Nothing saved in that field yet", true); return; }
+  try { await navigator.clipboard.writeText(t);
+    toast((which==="short"?"Short":"Full")+" bio copied \u2014 "+words(t)+" words"); }
+  catch (e) { window.prompt("Copy this bio:", t); }
+}
+
+function downloadBio(sid, name){
+  const t = bioText(sid, "both");
+  if (!t.trim()) { toast("No bio saved yet", true); return; }
+  saveBlob(new Blob([t], { type:"text/plain;charset=utf-8" }), nameSlug(name)+"-bio.txt");
+  toast("Bio saved as a text file");
+}
+
 const speakerUrl = token => new URL("speaker.html", location.href).href + "?k=" + token;
 
 /* Template A, filled from the record. Webinar only — a conference needs
@@ -1290,12 +1408,29 @@ function gateState(p,key){
   return st==="done" ? "done" : (st==="late" ? "late":"open");
 }
 const lateCount = p => p.tasks.filter(t=>taskStatus(p,t)==="late").length;
+
+/* The §2.1 package is due T−21. Before that date a missing bio is simply not
+   due yet and saying so would make every upcoming program look urgent, so this
+   counts nothing until the date has passed. Read from submissions(), the same
+   facts the panel shows, rather than from the checkboxes: an item that has
+   arrived and not been ticked is not outstanding. */
+function packageGap(p){
+  if (!p.program_speakers.length) return 0;
+  if (addDays(parseISO(p.event_date),-21) > todayUTC()) return 0;
+  /* Only items that have a deliverables row: where there is none the grid
+     shows a dash and there is nothing being tracked to be outstanding. */
+  return p.program_speakers.reduce((n,ps) =>
+    n + submissions(ps).filter(x => x.delivId && !x.at && !x.ticked).length, 0);
+}
+
 function alertsFor(p){
   if (isPast(p)) return [];
   const out=[];
   if (!p.program_speakers.length) out.push("No speakers named");
   else if (!speakersOk(p)) out.push("Speakers not confirmed");
   if (!p.description) out.push("No description for registration");
+  const g=packageGap(p);
+  if (g) out.push(g+(g===1?" package item outstanding":" package items outstanding"));
   const n=lateCount(p);
   if (n) out.push(n+(n===1?" task overdue":" tasks overdue"));
   return out;
@@ -1305,17 +1440,95 @@ function alertsFor(p){
    "which programs". Counted from the same facts alertsFor reads rather than
    by parsing its sentences, so the two cannot drift apart. */
 function alertRollup(list){
-  let noSpk=0, unconf=0, noDesc=0, late=0;
+  let noSpk=0, unconf=0, noDesc=0, late=0, gap=0;
   list.forEach(p => {
     if (!p.program_speakers.length) noSpk++;
     else if (!speakersOk(p)) unconf++;
     if (!p.description) noDesc++;
+    gap  += packageGap(p);
     late += lateCount(p);
   });
   return [[noSpk,"without speakers"],[unconf,"awaiting confirmation"],
           [noDesc,"without a description"],
+          [gap, gap===1 ? "package item outstanding" : "package items outstanding"],
           [late, late===1 ? "task overdue" : "tasks overdue"]]
     .filter(r => r[0]>0).map(r => r[0]+" "+r[1]);
+}
+
+/* ---- what a speaker has actually sent, as against what someone ticked ----
+   Three separate stores answer this question, and until now a coordinator had
+   to open each speaker's packet to read them:
+
+     speakers.bio / bio_short   written in the packet, or typed in by staff
+     speakers.headshot_at       stamped by speaker_save_headshot()
+     speaker_uploads            one row per file
+
+   The deliverables checkbox is a fourth record, and a manual one. Evidence and
+   checkbox are shown side by side on purpose: a tick with nothing behind it and
+   a file nobody ticked are both worth seeing, and neither was visible before.
+
+   'other' is the packet's own wording for "Signed agreement or something else",
+   so it is offered as evidence for the agreement but always named by its
+   filename rather than asserted to be the agreement. */
+const words = t => { t = String(t||"").trim(); return t ? t.split(/\s+/).length : 0; };
+
+function submissions(ps){
+  const sid  = ps.speakers?.id;
+  const b    = (sid && bios[sid]) || {};
+  const ups  = uploads[ps.id] || [];
+  const newest = list => list.slice().sort((x,y) =>
+    String(y.uploaded_at).localeCompare(String(x.uploaded_at)))[0] || null;
+  const upOf = kind => newest(ups.filter(u => u.kind === kind));
+
+  const bioText = (b.bio||"").trim(), bioShort = (b.bio_short||"").trim();
+
+  return PACKAGE_ITEMS.map(it => {
+    const dl = (ps.deliverables||[]).find(x => x.item === it.id);
+    let at = null, how = "", file = null, text = false;
+
+    if (it.id === "bio") {
+      if (bioText || bioShort) {
+        at = b.bio_updated_at; text = true;
+        how = (b.bio_updated_by === "staff" ? "typed in by staff" : "written by the speaker") +
+              " \u00b7 " + (bioShort ? words(bioShort)+"w short" : "no short bio") +
+              ", " + (bioText ? words(bioText)+"w full" : "no full bio");
+      } else { file = upOf("bio"); if (file) { at = file.uploaded_at; how = file.filename; } }
+    } else if (it.id === "headshot") {
+      if (b.headshot_at) { at = b.headshot_at; text = true;
+        how = "uploaded in the packet" + (b.headshot_mime ? " \u00b7 "+b.headshot_mime.replace("image/","") : ""); }
+      else { file = upOf("headshot"); if (file) { at = file.uploaded_at; how = file.filename; } }
+    } else if (it.id === "agreement") {
+      file = upOf("other"); if (file) { at = file.uploaded_at; how = file.filename; }
+    } else {
+      file = upOf(it.id); if (file) { at = file.uploaded_at; how = file.filename; }
+    }
+
+    return { item:it.id, label:it.label, ticked: !!(dl && dl.received),
+             delivId: dl ? dl.id : null, at, how, file, text,
+             speakerId: sid, name: ps.speakers?.full_name || "" };
+  });
+}
+
+/* Anything sent since this coordinator last cleared the marker. Kept per signed-in
+   address in localStorage: it is one person's reading position, not shared state,
+   and it must not add a write to the database on every page view. */
+const seenKey = () => "nacba.seen." + (myEmail || "anon");
+function lastSeen(){
+  try { return localStorage.getItem(seenKey()) || ""; } catch (e) { return ""; }
+}
+function markSeen(){
+  try { localStorage.setItem(seenKey(), new Date().toISOString()); } catch (e) {}
+}
+const isNew = at => !!at && String(at) > lastSeen();
+
+/* Every unseen submission across the season, newest first. */
+function newSubmissions(list){
+  const out = [];
+  (list||[]).forEach(p => (p.program_speakers||[]).forEach(ps =>
+    submissions(ps).forEach(x => {
+      if (x.at && isNew(x.at)) out.push({ ...x, program:p });
+    })));
+  return out.sort((a,b) => String(b.at).localeCompare(String(a.at)));
 }
 
 /* ================= calendar ================= */
@@ -1526,6 +1739,43 @@ function renderSpeaker(){
       (contact ? '<dl class="kv">'+contact+"</dl>"
         : '<p class="empty-note">Nothing recorded beyond the name yet.</p>') + "</section>";
 
+  /* The bio and the headshot belong to the person, not to one booking, so the
+     place to fetch them for a promo graphic is the speaker's own page. Until
+     now this page showed headshot_location — a note about where a file was
+     supposed to live — and never the file itself. */
+  const b = bios[s.id] || {};
+  const hasShot = !!b.headshot_at, hasBio = !!((b.bio||"").trim() || (b.bio_short||"").trim());
+  const assetPanel = '<section class="panel"><p class="panel-head">' +
+    '<span>Bio and headshot</span><span>held against the person</span></p>' +
+    '<div class="sub-items">' +
+      '<div class="sub-item '+(hasShot?"has":"missing")+'">' +
+        '<div class="sub-it-label">Headshot</div>' +
+        '<div class="sub-it-meta">' + (hasShot
+          ? "on file \u00b7 " + esc(FMT_LOG.format(new Date(b.headshot_at))) +
+            (b.headshot_mime ? " \u00b7 " + esc(b.headshot_mime.replace("image/","")) : "")
+          : "not on file") + "</div>" +
+        (hasShot ? '<div class="sub-acts"><button class="mini" data-dlshot="'+esc(s.id)+
+          '" data-name="'+esc(s.full_name)+'">Download image</button></div>' : "") +
+      "</div>" +
+      '<div class="sub-item '+(hasBio?"has":"missing")+'">' +
+        '<div class="sub-it-label">Biography</div>' +
+        '<div class="sub-it-meta">' + (hasBio
+          ? words(b.bio_short) + "w short, " + words(b.bio) + "w full" +
+            (b.bio_updated_at ? "<br>" + esc(FMT_LOG.format(new Date(b.bio_updated_at))) +
+              " \u00b7 " + (b.bio_updated_by === "staff" ? "typed in by staff"
+                                                     : "written by the speaker") : "")
+          : "nothing saved") + "</div>" +
+        (hasBio ? '<div class="sub-acts">' +
+          '<button class="mini" data-bio="'+esc(s.id)+'" data-which="short">Copy short</button>' +
+          '<button class="mini" data-bio="'+esc(s.id)+'" data-which="full">Copy full</button>' +
+          '<button class="mini" data-biotxt="'+esc(s.id)+'" data-name="'+esc(s.full_name)+
+          '">Save .txt</button></div>' : "") +
+      "</div>" +
+      (b.linkedin ? '<div class="sub-item has"><div class="sub-it-label">LinkedIn</div>' +
+        '<div class="sub-it-meta"><a href="'+esc(b.linkedin)+'" target="_blank" rel="noopener">' +
+        esc(b.linkedin.replace(/^https?:\/\//,""))+"</a></div></div>" : "") +
+    "</div></section>";
+
   return chrome(
     '<button class="back" data-roster>← All speakers</button>' +
     '<div class="detail-head"><h2>'+esc(s.full_name)+
@@ -1534,7 +1784,7 @@ function renderSpeaker(){
       '<p class="desc">'+ hist.length + (hist.length===1?" program":" programs") +
       (hist.length ? " · first " + esc(FMT_CARD.format(parseISO(hist[hist.length-1].p.event_date))) +
         ", most recent " + esc(FMT_CARD.format(parseISO(hist[0].p.event_date))) : "") + "</p></div>" +
-    detailsPanel +
+    detailsPanel + assetPanel +
     '<section class="panel"><p class="panel-head"><span>Topics they cover</span>' +
       "<span>click to tag</span></p>" + catChips("speaker", s.id, spkCats[s.id]||[]) + "</section>" +
     '<section class="panel"><p class="panel-head"><span>Programs</span><span>' +
@@ -1977,6 +2227,44 @@ function renderTeam(){
     "their address is on this list they can sign in and still see nothing.</p>");
 }
 
+/* The season's own inbox. Without this, the only way to learn that a speaker
+   had sent something was to open each packet in turn and read it — the portal
+   has no way to send mail yet, so nothing comes out to meet you. This at least
+   brings it to the front door, and clears on a click rather than per item:
+   the question being answered is "is there anything new", not "which of these
+   have I individually acknowledged". */
+function arrivalsPanel(){
+  const list = newSubmissions(programs.filter(p => !p.archived));
+  if (!list.length) return "";
+
+  const rows = list.slice(0,12).map(x => {
+    let act = "";
+    if (x.item === "headshot" && x.text)
+      act = '<button class="mini" data-dlshot="'+esc(x.speakerId)+'" data-name="'+esc(x.name)+
+            '">Download image</button>';
+    else if (x.item === "bio" && x.text)
+      act = '<button class="mini" data-bio="'+esc(x.speakerId)+'" data-which="short">Copy short</button>'+
+            '<button class="mini" data-biotxt="'+esc(x.speakerId)+'" data-name="'+esc(x.name)+
+            '">Save .txt</button>';
+    else if (x.file)
+      act = '<button class="mini" data-dl="'+esc(x.file.id)+'" data-fn="'+esc(x.file.filename)+
+            '">Download</button>';
+    return '<div class="arr"><span class="arr-date">'+
+      esc(FMT_SHORT.format(new Date(x.at)))+'</span>'+
+      '<span class="arr-text"><b>'+esc(x.name)+' \u2014 '+esc(x.label)+'</b> \u2014 '+
+        esc(x.program.title)+(x.how ? ' <span class="arr-how">'+esc(x.how)+"</span>" : "")+
+      "</span>"+
+      '<span class="arr-acts">'+act+"</span>"+
+      '<button class="arr-go" data-open="'+esc(x.program.id)+'">Open \u2192</button></div>';
+  }).join("");
+
+  return '<section class="alerts"><div class="sub-bar">'+
+    "<span>"+list.length+(list.length===1?" new submission":" new submissions")+
+      " since you last looked"+(list.length>12?" \u00b7 newest 12 shown":"")+"</span>"+
+    '<button class="mini" id="inbox-seen">Mark all as seen</button></div>'+
+    rows+"</section>";
+}
+
 function renderSeason(){
   if (view.creating) return chrome(newProgramForm());
   if (view.tab==="assign") return renderAssign();
@@ -2037,11 +2325,13 @@ function renderSeason(){
     lay("cards","Cards")+lay("calendar","Calendar")+"</div>";
   const newBtn = '<button class="btn primary" id="new-program">+ New program</button>';
 
+  const arrivals = arrivalsPanel();
+
   if (layout==="calendar")
-    return chrome(alerts + '<div class="tabs">'+seg+'<span class="spacer"></span>'+
+    return chrome(arrivals + alerts + '<div class="tabs">'+seg+'<span class="spacer"></span>'+
       newBtn+"</div>" + filter + renderCalendar());
 
-  return chrome(alerts + '<div class="tabs" role="tablist">' +
+  return chrome(arrivals + alerts + '<div class="tabs" role="tablist">' +
     tab("upcoming","Upcoming",upcoming.length)+tab("past","Completed",past.length)+
     tab("all","All",live.length)+tab("catalog","Catalogue",shelf.length)+
     '<span class="spacer"></span>'+seg+newBtn+"</div>" + filter +
@@ -2112,6 +2402,71 @@ function newProgramForm(){
     '<button class="btn" data-back>Cancel</button></div></div></section>';
 }
 
+/* One panel that answers "what has actually come in", per speaker, without
+   opening anybody's packet. Replaces the old file list, which showed uploaded
+   files only and so was silent about the two things speakers fill in directly:
+   their biography and their headshot. */
+function submissionsPanel(p){
+  if (!p.program_speakers.length) return "";
+
+  const rows = p.program_speakers.map(ps => {
+    const subs = submissions(ps);
+    const sid  = ps.speakers?.id;
+    const name = ps.speakers?.full_name || "";
+    const inHand = subs.filter(x => x.at).length;
+    const latest = subs.map(x => x.at).filter(Boolean)
+      .sort((a,b) => String(b).localeCompare(String(a)))[0];
+    const fresh = subs.some(x => isNew(x.at));
+
+    const cards = subs.map(x => {
+      const cls = !x.at ? "missing" : (x.ticked ? "has" : "unticked");
+      let acts = "";
+      if (x.at && x.item === "headshot" && x.text) {
+        acts = '<button class="mini" data-dlshot="'+esc(sid)+'" data-name="'+esc(name)+
+               '">Download image</button>';
+      } else if (x.at && x.item === "bio" && x.text) {
+        acts = '<button class="mini" data-bio="'+esc(sid)+'" data-which="short">Copy short</button>'+
+               '<button class="mini" data-bio="'+esc(sid)+'" data-which="full">Copy full</button>'+
+               '<button class="mini" data-biotxt="'+esc(sid)+'" data-name="'+esc(name)+
+               '">Save .txt</button>';
+      } else if (x.file) {
+        acts = '<button class="mini" data-dl="'+esc(x.file.id)+'" data-fn="'+esc(x.file.filename)+
+               '">Download</button>';
+      }
+      const when = x.at
+        ? esc(FMT_LOG.format(new Date(x.at))) + (isNew(x.at) ? ' <span class="chip chip-new">NEW</span>' : "")
+        : (x.ticked ? '<span class="chip chip-warn">ticked \u2014 nothing in the portal</span>'
+                    : "not in yet");
+      return '<div class="sub-item '+cls+'">'+
+        '<div class="sub-it-label">'+esc(x.label)+
+          (x.at && !x.ticked ? ' <span class="chip chip-warn">untick\u0065d</span>' : "")+
+          (x.at && x.ticked  ? ' <span class="chip chip-ok">\u2713</span>' : "")+
+        "</div>"+
+        '<div class="sub-it-meta">'+when+(x.how ? "<br>"+esc(x.how) : "")+"</div>"+
+        (acts ? '<div class="sub-acts">'+acts+"</div>" : "")+
+      "</div>";
+    }).join("");
+
+    return '<div class="sub-row"><div class="sub-head"><div>'+
+      '<div class="sp-name">'+esc(name)+
+        (fresh ? ' <span class="chip chip-new">NEW</span>' : "")+"</div>"+
+      '<div class="sp-meta">'+inHand+" of "+subs.length+" in hand"+
+        (latest ? " \u00b7 last arrived "+esc(FMT_LOG.format(new Date(latest))) : "")+
+      "</div></div></div>"+
+      '<div class="sub-items">'+cards+"</div></div>";
+  }).join("");
+
+  const fresh = p.program_speakers.some(ps => submissions(ps).some(x => isNew(x.at)));
+  const bar = fresh
+    ? '<div class="sub-bar"><span>New since you last looked</span>'+
+      '<button class="mini" id="sub-seen">Mark all as seen</button></div>'
+    : "";
+
+  return '<section class="panel"><p class="panel-head"><span>What speakers have sent</span>'+
+    '<span>bio and headshot live on the speaker, files on the booking</span></p>'+
+    bar + rows + "</section>";
+}
+
 function renderDetail(){
   const p=programs.find(x=>x.id===view.id);
   if (!p) return chrome("");
@@ -2172,13 +2527,21 @@ function renderDetail(){
   /* package */
   let pkgPanel="";
   if (p.program_speakers.length){
-    const rows=p.program_speakers.map(ps=>'<tr><td class="n">'+esc(ps.speakers?.full_name||"")+"</td>"+
+    /* The checkbox stays the record §2.1 and the gate read from; the marker
+       beside it says something is in the portal that nobody has ticked yet. */
+    const rows=p.program_speakers.map(ps=>{
+      const subs=submissions(ps);
+      return '<tr><td class="n">'+esc(ps.speakers?.full_name||"")+"</td>"+
       PACKAGE_ITEMS.map(it=>{
         const dl=(ps.deliverables||[]).find(x=>x.item===it.id);
         if (!dl) return "<td>—</td>";
-        return '<td><input type="checkbox" data-deliv="'+dl.id+'"'+(dl.received?" checked":"")+
-          ' aria-label="'+esc((ps.speakers?.full_name||"")+" "+it.label)+'"></td>';
-      }).join("")+"</tr>").join("");
+        const x=subs.find(y=>y.item===it.id);
+        const mark = (x && x.at && !dl.received)
+          ? '<span class="ev-mark" title="In the portal, not ticked">\u25b8</span>' : "";
+        return '<td class="ev"><input type="checkbox" data-deliv="'+dl.id+'"'+(dl.received?" checked":"")+
+          ' aria-label="'+esc((ps.speakers?.full_name||"")+" "+it.label)+'">'+mark+"</td>";
+      }).join("")+"</tr>";
+    }).join("");
     pkgPanel='<section class="panel"><p class="panel-head"><span>Speaker package · §2.1</span>'+
       '<span>due T−21</span></p><div class="pk-scroll"><table class="pk"><thead><tr><th class="n">Speaker</th>'+
       PACKAGE_ITEMS.map(it=>"<th>"+esc(it.label)+"</th>").join("")+
@@ -2231,18 +2594,7 @@ function renderDetail(){
       "</section>";
 
   /* what speakers have sent in */
-  const inbox = p.program_speakers.flatMap(ps =>
-    (uploads[ps.id]||[]).map(u => ({ ...u, who: ps.speakers?.full_name || "" })));
-  const inboxPanel = inbox.length
-    ? '<section class="panel"><p class="panel-head"><span>Sent in by speakers</span><span>'+
-      inbox.length + (inbox.length===1?" file":" files") + '</span></p>'+
-      inbox.map(u =>
-        '<div class="sp-row"><div><div class="sp-name">'+esc(u.filename)+'</div>'+
-        '<div class="sp-meta">'+esc(u.who)+' · '+esc(u.kind)+' · '+esc(kb(u.size_bytes))+
-        ' · '+esc(FMT_LOG.format(new Date(u.uploaded_at)))+'</div></div>'+
-        '<button class="mini" data-dl="'+esc(u.id)+'" data-fn="'+esc(u.filename)+
-        '">Download</button></div>').join("")+'</section>'
-    : "";
+  const inboxPanel = submissionsPanel(p);
 
   const mineOpen = myEmail
     ? p.tasks.filter(t=>!t.done && (t.assignee_email||"").toLowerCase()===myEmail).length
@@ -2255,7 +2607,7 @@ function renderDetail(){
     "</tbody></table></div></section>";
 
   return chrome('<button class="back" data-back>← All programs</button>'+head+
-    catPanel+speakersPanel+pkgPanel+inboxPanel+statsPanel+docket+historyPanel(p.id));
+    catPanel+speakersPanel+inboxPanel+pkgPanel+statsPanel+docket+historyPanel(p.id));
 }
 
 function editProgramForm(p){
@@ -2696,6 +3048,16 @@ function wire(){
 
   on("[data-dl]","click",el=>
     downloadUpload(el.getAttribute("data-dl"), el.getAttribute("data-fn")));
+  on("[data-dlshot]","click",el=>
+    downloadHeadshot(el.getAttribute("data-dlshot"), el.getAttribute("data-name")));
+  on("[data-bio]","click",el=>
+    copyBio(el.getAttribute("data-bio"), el.getAttribute("data-which")));
+  on("[data-biotxt]","click",el=>
+    downloadBio(el.getAttribute("data-biotxt"), el.getAttribute("data-name")));
+  document.getElementById("sub-seen")?.addEventListener("click",()=>{
+    markSeen(); render(); toast("Marked as seen"); });
+  document.getElementById("inbox-seen")?.addEventListener("click",()=>{
+    markSeen(); render(); toast("Marked as seen"); });
 
   on("[data-editsp]","click",el=>{
     view={ ...view, editSpeaker: el.getAttribute("data-editsp") }; render(); });
