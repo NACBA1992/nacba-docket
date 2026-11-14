@@ -202,8 +202,65 @@ Uploading does **not** mark a deliverable received. The speaker's page shows "yo
 sent this"; staff tick the box after reviewing. Those are different facts and the
 system keeps them apart.
 
-Staff see arrivals under "Sent in by speakers" on the program page and download one
-file at a time via `upload_bytes(id)`. List queries never carry the bytes.
+Staff see arrivals under "What speakers have sent" on the program page and download
+one file at a time via `upload_bytes(id)`. List queries never carry the bytes.
+
+## What a speaker has sent, and getting it back out
+
+Three different places hold what a speaker submits, which is why the answer used to
+need a click into each packet:
+
+| What | Where it lives | Read it with |
+| --- | --- | --- |
+| Short and full biography | `speakers.bio`, `speakers.bio_short` | ordinary select |
+| Headshot | `speakers.headshot` (`bytea`) | `speaker_headshot(speaker_id)` |
+| Files (agreement, outline, deck) | `speaker_uploads.data` | `upload_bytes(id)` |
+
+The bio and the headshot hang off the **person**, not the booking, so a returning
+speaker is never asked twice — and a headshot fetched for one program is the same
+file as for the next.
+
+`speakers.headshot` is never in a list query. It is capped at 10 MB and would
+otherwise be pulled down on every page load; `headshot_at` is the presence flag and
+costs nothing. The bytes come down one speaker at a time, only when asked for.
+
+**The panel** on the program page reads all three and shows them per speaker, with
+what arrived, when, and whether anyone ticked the box for it. Two states are worth
+knowing:
+
+- **unticked** — it is in the portal and nobody has marked it received. The §2.1
+  grid shows a small ▸ beside the same box.
+- **ticked — nothing in the portal** — the box is ticked but nothing was ever sent
+  here. Usually it came by email. Not an error; just not something this app can show
+  you.
+
+**Getting it out.** Download the headshot, copy either bio length, or save both to a
+`.txt`, from the program page, the speaker's own page under Speakers, or the season
+inbox. The image comes down exactly as the speaker sent it — nothing is resized or
+re-encoded on the way in or out, so it is as high-resolution as what they uploaded.
+
+**The season inbox** lists everything that has arrived since you last cleared it,
+newest first, with the same buttons. "Mark all as seen" is per person and kept in
+your browser, not the database: it is one coordinator's reading position, and
+writing it to the database would mean a write on every page view.
+
+### Email alerts are not built, and why
+
+Nothing in this project sends mail, on purpose and not for want of trying. Three
+things are needed first, and all three are NACBA's to do:
+
+1. **A shared mailbox** in NACBA's Microsoft 365 tenant — free, no licence. It
+   becomes the public From line.
+2. **An Entra ID app registration** with `Mail.Send`, **fenced by an Exchange
+   application access policy to that one mailbox**. Unscoped, that permission sends
+   as any mailbox in the tenant. Treat the missing policy as a blocker, not polish.
+3. **One deploy of an edge function** by somebody who holds Supabase deploy access.
+   It should be written as a dumb pipe — recipient, subject, body in, send — so that
+   the wording stays in the portal and the function never needs redeploying for a
+   copy change.
+
+Until then the season inbox is the substitute: it does not come to you, but it does
+mean nothing has to be opened to find out whether anything arrived.
 
 ## Working with the database
 
