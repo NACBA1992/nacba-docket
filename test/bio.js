@@ -82,8 +82,13 @@ ok('full-bio textarea', /<textarea id="bio-full"/.test(bio));
 ok('linkedin input', /id="bio-li"/.test(bio));
 ok('save button', /id="bio-go"/.test(bio));
 ok('status line', /id="bio-status"/.test(bio));
-ok('headshot file input accepts images only',
-   /id="bio-shot"[^>]*accept="image\/jpeg,image\/png,image\/webp"/.test(bio));
+// The picker offers HEIC deliberately: hiding it only means a speaker
+// cannot find their own photo, and the page converts it before sending.
+{ const acc=(bio.match(/id="bio-shot"[^>]*accept="([^"]*)"/)||[])[1]||'';
+  ok('headshot file input accepts images only',
+     acc.length>0 && acc.split(',').every(t=>/^(image\/|\.(heic|heif)$)/.test(t.trim())));
+  ok('and offers iPhone photos, which the page converts',
+     /heic/i.test(acc)); }
 ok('explains it is kept against the person, not one webinar',
    /rather than one webinar/.test(bio));
 ok('word-count targets are shown', /id="bio-short-count"/.test(bio)&&/id="bio-full-count"/.test(bio));
@@ -130,13 +135,35 @@ ok('does not call the database with nothing',
 ok('and says why', /Write something first/.test(st['bio-status'].textContent));
 
 console.log('\nheadshot:');
+// A real PNG, because the page now reads the first bytes to decide what the
+// file actually is. A stub with a size and a type and nothing behind it is
+// the shape of file that let an HEIC through in the first place.
+const pngBytes=new Uint8Array(fs.readFileSync(__dirname+'/fixtures/real.png'));
+const realFile=(bytes,name,type)=>({
+  name, type, size:bytes.length,
+  slice:(a,b)=>({ arrayBuffer:async()=>bytes.slice(a,b).buffer }),
+  __bytes:bytes });
 calls.length=0;
-st['bio-shot'].files=[{name:'me.png',size:4,type:'image/png'}];
+st['bio-shot'].files=[realFile(pngBytes,'me.png','image/png')];
 listeners.find(l=>l.id==='bio-shot'&&l.ev==='change').fn({});
-await tick(); await tick();   // read the file, then call the database
+// sniff the header, then read the file, then call the database
+await tick(); await tick(); await tick();
 const shot=calls.find(c=>c.name==='speaker_save_headshot');
 ok('calls speaker_save_headshot', !!shot);
-ok('sends mime and base64', shot&&shot.args.p_mime==='image/png'&&shot.args.p_b64==='QUJD');
+ok('sends the format it proved, not the one it was told',
+   !!shot && shot.args.p_mime==='image/png');
+ok('sends base64', !!shot && typeof shot.args.p_b64==='string' && shot.args.p_b64.length>0);
+
+// An iPhone photo mislabelled by the browser must not reach the database.
+calls.length=0;
+const heicBytes=new Uint8Array(fs.readFileSync(__dirname+'/fixtures/photo.heic'));
+st['bio-shot'].files=[realFile(heicBytes,'IMG_4021.HEIC','image/jpeg')];
+listeners.find(l=>l.id==='bio-shot'&&l.ev==='change').fn({});
+await tick(); await tick(); await tick();
+ok('an HEIC claiming to be a JPEG is stopped here',
+   !calls.some(c=>c.name==='speaker_save_headshot'));
+ok('and the speaker is told what to send instead',
+   /HEIC|iPhone photo/.test(st['bio-shot-status'].textContent));
 
 console.log(fails?'\n'+fails+' FAILED':'\nall passed');
 process.exit(fails?1:0);

@@ -545,7 +545,7 @@ function render(d) {
     "your name rather than one webinar \u2014 send it once and we will not ask again.</p>" +
     '<div class="bio-shot" id="bio-shot-now"></div>' +
     '<p class="up-file" style="margin-top:.5rem">' +
-    '<input type="file" id="bio-shot" accept="image/jpeg,image/png,image/webp"></p>' +
+    '<input type="file" id="bio-shot" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"></p>' +
     '<p class="up-status" id="bio-shot-status"></p>' +
     "</div></div></div></section>";
 
@@ -768,6 +768,58 @@ function wireBio(d){
     go.disabled = false;
   });
 
+  /* ---- what the file really is, and making it something we can keep ----
+
+     A photo sent straight from an iPhone is HEIC. Safari reports some of
+     them as image/jpeg, so the browser's own label cannot be trusted and
+     the accept attribute above is only a hint to the file picker. Left
+     alone, an HEIC uploads cleanly, is recorded as a JPEG, and then opens
+     nowhere the coordinator needs it.
+
+     So: look at the first bytes. Anything already usable is sent exactly
+     as it came, because re-encoding a good JPEG only loses detail and the
+     whole point of a headshot is that it stays print-sharp. Anything else
+     is drawn onto a canvas and saved as a high-quality JPEG, which Apple
+     devices can do for their own format. If even that fails, say so here,
+     while the speaker is still holding the file. */
+  const IMAGE_CAP = 3000;   // longest edge; keeps a converted file well inside 10 MB
+
+  async function readableImage(file){
+    const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const at = (i, ...b) => b.every((v, k) => head[i+k] === v);
+
+    const alreadyFine =
+      at(0, 0xFF,0xD8,0xFF)                              ? "image/jpeg" :
+      at(0, 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)     ? "image/png"  :
+      (at(0, 0x52,0x49,0x46,0x46) && at(8, 0x57,0x45,0x42,0x50)) ? "image/webp" : null;
+
+    if (alreadyFine) return { blob: file, mime: alreadyFine, converted: false };
+
+    const isIso = at(4, 0x66,0x74,0x79,0x70);
+    const label = isIso ? "an iPhone photo" : "that image";
+
+    let bmp;
+    try {
+      bmp = await createImageBitmap(file);
+    } catch (e) {
+      throw new Error(isIso
+        ? "That looks like an iPhone photo (HEIC), and this browser cannot convert it. "
+        + "Open it in Photos, choose File \u2192 Export, pick JPEG, and send that."
+        : "That file does not look like an image we can read. Please send a JPEG or PNG.");
+    }
+
+    const scale = Math.min(1, IMAGE_CAP / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(bmp, 0, 0, w, h);
+    bmp.close && bmp.close();
+
+    const blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.92));
+    if (!blob) throw new Error("We could not convert " + label + ". Please send a JPEG or PNG.");
+    return { blob, mime: "image/jpeg", converted: true, w, h };
+  }
+
   /* ---- save the headshot ---- */
   shotIn?.addEventListener("change", async () => {
     const file = shotIn.files && shotIn.files[0];
@@ -775,21 +827,37 @@ function wireBio(d){
     if (file.size === 0)         { say(shotStat, "That file is empty.", "err"); return; }
     if (file.size > MAX_BYTES)   { say(shotStat, "That image is " + kb(file.size) +
                                      ". The limit is 10 MB.", "err"); return; }
-    say(shotStat, "Sending " + file.name + "\u2026");
+    say(shotStat, "Checking " + file.name + "\u2026");
+    let ready;
+    try {
+      ready = await readableImage(file);
+    } catch (e) {
+      say(shotStat, e.message, "err"); shotIn.value = ""; return;
+    }
+    if (ready.blob.size > MAX_BYTES) {
+      say(shotStat, "That image is still " + kb(ready.blob.size) +
+          " after converting. The limit is 10 MB.", "err");
+      shotIn.value = ""; return;
+    }
+    say(shotStat, (ready.converted ? "Converting and sending " : "Sending ") + file.name + "\u2026");
     try {
       const b64 = await new Promise((res, rej) => {
         const r = new FileReader();
         r.onload  = () => res(String(r.result).split(",")[1] || "");
         r.onerror = () => rej(new Error("read failed"));
-        r.readAsDataURL(file);
+        r.readAsDataURL(ready.blob);
       });
       const { data: r, error } = await sb.rpc("speaker_save_headshot", {
-        tok, p_mime: file.type || "", p_b64: b64
+        tok, p_mime: ready.mime, p_b64: b64
       });
       if (error)       say(shotStat, "That didn't send. Please try again.", "err");
       else if (!r?.ok) say(shotStat, r?.error || "That didn't send.", "err");
       else {
-        say(shotStat, "Got it \u2014 thank you. " + kb(r.bytes) + " saved to your record.", "ok");
+        say(shotStat, "Got it \u2014 thank you. " + kb(r.bytes) + " saved to your record." +
+            (ready.converted
+              ? " We converted it to a JPEG (" + ready.w + "\u00d7" + ready.h +
+                ") so NACBA's designers can open it."
+              : ""), "ok");
         showShot(r.saved_at); shotIn.value = "";
       }
     } catch (e) { say(shotStat, "That didn't send. Please try again.", "err"); }

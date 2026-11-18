@@ -234,6 +234,16 @@ knowing:
   here. Usually it came by email. Not an error; just not something this app can show
   you.
 
+**Headshots are checked, not trusted.** A photo sent from an iPhone is HEIC, and
+Safari reports some of them as `image/jpeg`, so the browser's own label proves
+nothing. The packet reads the first bytes of the file: a JPEG, PNG or WebP is sent
+exactly as it came, so no detail is lost, and anything else is converted to a
+high-quality JPEG in the browser before it is sent. `speaker_save_headshot()` then
+checks the bytes again and stores the format the file proves rather than the one it
+claims — it also rejects a JPEG or PNG with a missing trailer, which is what an
+interrupted upload looks like. Both halves matter: the conversion keeps it painless
+for the speaker, the database check keeps it true whatever a future browser does.
+
 **Getting it out.** Download the headshot, copy either bio length, or save both to a
 `.txt`, from the program page, the speaker's own page under Speakers, or the season
 inbox. The image comes down exactly as the speaker sent it — nothing is resized or
