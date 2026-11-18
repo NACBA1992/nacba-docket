@@ -1166,19 +1166,85 @@ const saveBlob = (blob, filename) => {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 };
 
+/* What the bytes actually are, as against what the database was told they
+   were. Two different failures look identical to someone clicking Download:
+   a photo in a format the browser cannot open, and a file whose upload was
+   cut off halfway. Both want a resend, but only the second is NACBA's fault,
+   and saying which saves a confusing exchange with the speaker.
+
+   A truncated JPEG or PNG is the likely shape of an interrupted upload: the
+   header is intact, so the file looks valid, and it renders as a grey half
+   image or refuses to open at all. Both formats mark their own end, so the
+   check is cheap and certain. */
+function identifyImage(buf){
+  const at  = (i, ...b) => b.every((v, k) => buf[i+k] === v);
+  const tail = (...b) => b.every((v, k) => buf[buf.length - b.length + k] === v);
+
+  if (!buf.length) return { ok:false, message:"That headshot is empty in the database. Ask the speaker to send it again." };
+
+  if (at(0, 0xFF,0xD8,0xFF)) {
+    if (!tail(0xFF,0xD9))
+      return { ok:false, message:"That headshot is a JPEG that was cut off before it finished uploading \u2014 the file in the database is incomplete. Ask the speaker to send it again." };
+    return { ok:true, mime:"image/jpeg", ext:"jpg", label:"JPEG" };
+  }
+  if (at(0, 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)) {
+    if (!tail(0x49,0x45,0x4E,0x44,0xAE,0x42,0x60,0x82))
+      return { ok:false, message:"That headshot is a PNG that was cut off before it finished uploading \u2014 the file in the database is incomplete. Ask the speaker to send it again." };
+    return { ok:true, mime:"image/png", ext:"png", label:"PNG" };
+  }
+  if (at(0, 0x52,0x49,0x46,0x46) && at(8, 0x57,0x45,0x42,0x50))
+    return { ok:true, mime:"image/webp", ext:"webp", label:"WebP" };
+  if (at(0, 0x47,0x49,0x46,0x38))
+    return { ok:true, mime:"image/gif", ext:"gif", label:"GIF" };
+
+  /* ISO base media: HEIC and AVIF both carry 'ftyp' at offset 4. An iPhone
+     photo sent straight from Photos is HEIC, and some browsers report it as
+     image/jpeg on the way in, so it passes the upload check and then will
+     not open on a Windows machine or in most design tools. */
+  if (at(4, 0x66,0x74,0x79,0x70)) {
+    const brand = String.fromCharCode(buf[8],buf[9],buf[10],buf[11]);
+    if (/^(heic|heix|hevc|hevx|mif1|msf1)$/.test(brand))
+      return { ok:false, message:"That headshot is an Apple HEIC photo, not a JPEG, so most tools will refuse to open it. Ask the speaker to resend it as a JPEG or PNG." };
+    if (/^avif?$/.test(brand.slice(0,4)) || brand === "avif")
+      return { ok:false, message:"That headshot is an AVIF image, which most design tools cannot open. Ask the speaker to resend it as a JPEG or PNG." };
+  }
+  if (at(0, 0x49,0x49,0x2A,0x00) || at(0, 0x4D,0x4D,0x00,0x2A))
+    return { ok:true, mime:"image/tiff", ext:"tif", label:"TIFF" };
+  if (at(0, 0x25,0x50,0x44,0x46))
+    return { ok:false, message:"That headshot is a PDF, not an image. Ask the speaker for the photo itself." };
+
+  return { ok:false, message:"That headshot is not a readable image \u2014 the first bytes match no known format, so the stored file is damaged. Ask the speaker to send it again." };
+}
+
 async function downloadHeadshot(sid, name){
   toast("Fetching the headshot\u2026");
   const { data, error } = await sb.rpc("speaker_headshot", { sid });
-  if (error)    { toast("Could not fetch that headshot", true); return; }
+  /* Say what actually went wrong. A swallowed error here is indistinguishable
+     from an empty record, and the two have completely different fixes. */
+  if (error) {
+    console.error("speaker_headshot failed", error);
+    toast("Headshot fetch failed: " + (error.message || error.code || "unknown error"), true);
+    return;
+  }
   if (!data?.ok){ toast(data?.error || "No headshot on file", true); return; }
   try {
     const bin = atob(data.b64);
     const buf = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-    const ext = ({ "image/jpeg":"jpg", "image/png":"png", "image/webp":"webp" })[data.mime] || "jpg";
-    saveBlob(new Blob([buf], { type: data.mime }), nameSlug(name)+"-headshot."+ext);
-    toast("Headshot downloaded \u2014 "+kb(buf.length)+", as the speaker sent it");
-  } catch (e) { toast("Could not decode that headshot", true); }
+    const id = identifyImage(buf);
+    console.info("headshot", { recorded: data.mime, bytes: buf.length, actual: id });
+    if (!id.ok) {
+      toast(id.message + " (" + kb(buf.length) + ")", true);
+      return;
+    }
+    saveBlob(new Blob([buf], { type: id.mime }), nameSlug(name)+"-headshot."+id.ext);
+    toast("Headshot downloaded \u2014 "+kb(buf.length)+" "+id.label+
+          (id.mime !== data.mime ? " (recorded as "+(data.mime||"nothing")+")" : "") +
+          ", as the speaker sent it");
+  } catch (e) {
+    console.error("headshot decode failed", e);
+    toast("Could not decode that headshot: " + (e.message || "unknown"), true);
+  }
 }
 
 /* Bio text, for dropping into a promo graphic. Copy is the common case;

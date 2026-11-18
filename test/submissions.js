@@ -9,11 +9,16 @@ s=s.replace(/^import .*$/m,'')
    .replace(/^const sb =.*$/m,`var sb={auth:{onAuthStateChange(){},getSession:async()=>({data:{}})},
      rpc:(name,args)=>{global.__rpc.push({name,args});
        return Promise.resolve({data:name==='speaker_headshot'
-         ? {ok:true,mime:'image/jpeg',b64:'/9j/4AAQSkZJRg==',at:'2026-11-12T18:04:00Z'}
+         ? {ok:true,mime:'image/jpeg',b64:global.__realJpegB64,at:'2026-11-12T18:04:00Z'}
          : {ok:true},error:null});}};`)
    .replace(/^const app = .*$/m,'var app=global.__a;')
    .replace(/^const /gm,'var ').replace(/^let /gm,'var ');
 global.__rpc=rpcCalls;
+// A genuine JPEG, not a header-shaped stub: downloadHeadshot now checks that
+// a file is complete, and a fake image is indistinguishable from a truncated
+// upload — which is the bug this fixture exists to stop us from shipping again.
+global.__realJpegB64 = fs.readFileSync(path.join(__dirname,'fixtures','real.jpg'))
+  .toString('base64').replace(/(.{76})/g,'$1\n');
 const handlers=[];
 const mkEl=(a={})=>({innerHTML:'',textContent:'',className:'',value:'',hidden:true,checked:false,
   classList:{contains:()=>false},getAttribute:k=>a[k]??null,
